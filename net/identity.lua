@@ -5,12 +5,13 @@ Adds
 net.identity:init()
 
 ]]
-net:registerModule("identity",{2,0,1})--1.0.1 Note: Added eaiser ways to get user data using only cid
+net:registerModule("identity",{2,1,0})--1.0.1 Note: Added eaiser ways to get user data using only cid
 function net.hash(text,n)
 	n=n or 16
 	return bin.new(text.."jgmhktyf"):getHash(n)
 end
 net.identity.UIDS={}
+net.identity.UIDS.ids={}
 function net.identity:init() -- calling this initilizes the library and binds it to the servers and clients created
 	--Server Stuff
 	net.OnServerCreated(function(s)
@@ -24,27 +25,43 @@ function net.identity:init() -- calling this initilizes the library and binds it
 			local nick,dTable=userdata:match("%S-|%S-|(%S-)|(.+)")
 			return nick,loadstring("return "..(dTable or "{}"))()
 		end
+		function s:modifyUserData(user,oldpass,pass,nick,dTable)
+			if self:_isRegistered(user) then
+				local userdata=bin.load(self.userFolder..net.hash(user)..".dat")
+				local args={}
+				local _pass,_nick,_dTable=userdata:match("%S-|(%S-)|(%S-)|(.+)")
+				if oldpass~=_pass then
+					args.invalidPass=true
+					pass=_pass
+				end
+				if not nick then nick=_nick args.invalidNick=true end
+				table.merge(_dTable or {}, dTable or {})
+				bin.new(string.format("%s|%s|%s|%s\n",user,pass,nick,dTable)):tofile(self.userFolder..net.hash(user)..".dat")
+			else
+				return false
+			end
+		end
 		function s:getUserCred(user)
 			local userdata=bin.load(self.userFolder..net.hash(user)..".dat")
 			return userdata:match("%S-|(%S-)|")
 		end
-		function s:getUSERID(cid) -- Quality of life functions
+		function s:getUSERID(cid)
 			return (net.identity.UIDS[cid] or "User Not Logged In!")
 		end
-		function s:getUsername(cid) -- Quality of life functions
+		function s:getUsername(cid)
 			return self:userLoggedIn(cid)
 		end
-		function s:getNickname(cid) -- Quality of life functions
+		function s:getNickname(cid)
 			return self.loggedIn[self:getUsername(cid)].nick
 		end
-		function s:getdTable(cid) -- Quality of life functions
+		function s:getdTable(cid)
 			return self.loggedIn[self:getUsername(cid)]
 		end
-		function s:getUserData(cid) -- Quality of life functions
+		function s:getUserDat(cid)
 			return self:getUserDataHandle(self:getUsername(cid))
 		end
-		function s:nickTaken(nick)
-			--
+		function s:getNickFromUSERID(USERID)
+			return bin.load(self.userFolder..net.hash(user)..".dat"):match("%S-|%S-|(%S-)|")
 		end
 		function s:userLoggedIn(cid)
 			for i,v in pairs(self.loggedIn) do
@@ -60,20 +77,20 @@ function net.identity:init() -- calling this initilizes the library and binds it
 			end
 			self.userFolder=loc
 		end
-		s:setDataLocation("USERS")
+		s:setDataLocation("USERS/")
 		function s:logoutUser(user)
 			net.identity.UIDS.ids[user.UID]=nil
 			self.loggedIn[user]=nil
 		end
 		function s:loginUser(user,cid)
-			net.identity.UIDS[cid]=bin.new(user):getHash(32)
+			net.identity.UIDS[cid]=net.hash(user)
 			local nick,dTable=self:getUserData(user)
 			self.loggedIn[user]={}
 			table.merge(self.loggedIn[user],dTable or {})
 			self.loggedIn[user].cid=cid
 			self.loggedIn[user].nick=nick
 			self.loggedIn[user].UID=net.resolveID(net.identity.UIDS)
-			return self:getUserDataHandle(user)
+			return self.loggedIn[user]
 		end
 		function s:getUserDataHandle(user)
 			return self.loggedIn[user]
@@ -110,10 +127,6 @@ function net.identity:init() -- calling this initilizes the library and binds it
 						self:send(ip,"!identity! REGISTERREFUSED <-|Nickname too short|->",port)
 						return
 					end
-					if not self.allowDuplicateNicks and self:nickTaken(nick) then
-						self:send(ip,"!identity! REGISTERREFUSED <-|Nickname already taken|->",port)
-						return
-					end
 					for i=1,#rets do
 						if rets[i][1]==false then
 							print("Server refused to accept registration request!")
@@ -121,14 +134,29 @@ function net.identity:init() -- calling this initilizes the library and binds it
 							return
 						end
 					end
-					bin.new(string.format("%s|%s|%s|%s\n",user,pass,nick,dTable)):tofile(self.userFolder..net.hash(user)..".dat")
-					self:send(ip,"!identity! REGISTEREDGOOD <-|"..user.."|->",port)
-					if not allowDuplicateNicks then
-						if not self.dupnickfilemanager then
-							self.dupnickfilemanager=bin.stream("Nicks.dat",false)
+					multi:newFunction(function(func) -- anom func, allows for fancy multitasking
+						local dupnickfilemanager=bin.stream(self.userFolder.."Nicks.dat",false)
+						local isValid=func:newCondition(function() return t~=nil end)
+						local tab={}
+						local t=dupnickfilemanager:getBlock("s")
+						if self.allowDuplicateNicks==false then
+							while func:condition(isValid) do
+								tab[#tab]=t
+								if t==nick then
+									self:send(ip,"!identity! REGISTERREFUSED <-|Duplicate Nicks are not allowed|->",port)
+									dupnickfilemanager:close()
+									return
+								end
+							end
+							t=dupnickfilemanager:getBlock("s")
 						end
-						self.dupnickfilemanager:addBlock(nick)
-					end
+						dupnickfilemanager:addBlock(nick.."|"..bin.new(user):getHash(32))
+						dupnickfilemanager:close()
+						bin.new(string.format("%s|%s|%s|%s\n",user,pass,nick,dTable)):tofile(self.userFolder..net.hash(user)..".dat")
+						self:send(ip,"!identity! REGISTEREDGOOD <-|"..user.."|->",port)
+						func=nil -- we dont want 1000s+ of these anom functions lying around
+						return
+					end)()-- lets call the function
 				end
 				return
 			elseif cmd=="login" then
@@ -138,7 +166,6 @@ function net.identity:init() -- calling this initilizes the library and binds it
 					self:send(ip,"!identity! LOGINBAD <-|nil|->",port)
 					return
 				end
-				print(pass,_pass)
 				if pass==_pass then
 					if self:userLoggedIn(cid) then
 						self.OnAlreadyLoggedIn:Fire(self,user,cid,ip,port)

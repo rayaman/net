@@ -11,7 +11,7 @@ function net.settings:init() -- calling this initilizes the library and binds it
 	--Server Stuff
 	net.OnServerCreated:connect(function(s)
 		print("The Settings Module has been loaded onto the server!")
-		s.OnDataRecieved:connect(function(self,data,cid,ip,port) -- when the server recieves data this method is triggered
+		s.OnDataRecieved(function(self,data,cid,ip,port) -- when the server recieves data this method is triggered
 			local namespace,args=data:match("!settings! (%s+) (.+)")
 			local args
 			if namespace then
@@ -23,7 +23,7 @@ function net.settings:init() -- calling this initilizes the library and binds it
 					end
 				end
 			end
-		end)
+		end,"settings")
 		function s:regSetting(namespace,settings)
 			if not net.settings.config[namespace] then
 				net.settings.config[namespace]={}
@@ -35,9 +35,9 @@ function net.settings:init() -- calling this initilizes the library and binds it
 	end)
 	--Client Stuff
 	net.OnClientCreated:connect(function(c)
-		c.OnDataRecieved:connect(function(self,data) -- when the client recieves data this method is triggered
+		c.OnDataRecieved:(function(self,data) -- when the client recieves data this method is triggered
 			--First Lets make sure we are getting Setting data
-		end)
+		end,"setings")
 		function sendSetting(namespace,args)
 			self:send("!settings! "..namespace.." "..args)
 		end

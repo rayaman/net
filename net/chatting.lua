@@ -20,7 +20,6 @@ function net.chatting:init() -- calling this initilizes the library and binds it
 		s.OnUserLoggedIn(function(user,cid,ip,port,dTable)
 			dTable=loadstring("return "..dTable)()
 			local USERID=bin.new(user):getHash(32)
-			print(USERID)
 			net.chatting.users[USERID]={dTable.nick,cid,ip,port,dTable} -- add users that log in to the userlist
 			net.chatting.users[ip]=USERID -- add users that log in to the userlist
 			local users={}

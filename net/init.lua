@@ -1,12 +1,38 @@
+--[[
+	UPCOMMING ADDITIONS
+	AUDP - advance udp/ Ensures packets arrive and handles late packets.
+	P2P - peer to peer (Server to set up initial connection)
+	Relay - offput server load (locally)
+	Threading - Simple threading (UDP/AUDP Only)
+	Priority handling
+]]
+--[[
+	TODO: Finish stuff for Priority handling
+]]
+function table.merge(t1, t2)
+    for k,v in pairs(t2) do
+    	if type(v) == 'table' then
+    		if type(t1[k] or false) == 'table' then
+    			table.merge(t1[k] or {}, t2[k] or {})
+    		else
+    			t1[k] = v
+    		end
+    	else
+    		t1[k] = v
+    	end
+    end
+    return t1
+end
 function string.trim(s)
 	local from = s:match"^%s*()"
 	return from > #s and "" or s:match(".*%S", from)
 end
 socket=require("socket")
+http=require("socket.http")
 mime=require("mime")
 net={}
-net.Version={1,5,0}
-net._VERSION="1.5.0"
+net.Version={2,0,0} -- This will probably stay this version for quite a while... The modules on the otherhand will be more inconsistant
+net._VERSION="2.0.0"
 net.OnServerCreated=multi:newConnection()
 net.OnClientCreated=multi:newConnection()
 net.loadedModules={}
@@ -18,6 +44,19 @@ end
 function net.denormalize(input)
 	local unenc=mime.unb64(input)
 	return unenc
+end
+function net.getLocalIP()
+	local someRandomIP = "192.168.1.122"
+	local someRandomPort = "3102"
+	local mySocket = socket.udp()
+	mySocket:setpeername(someRandomIP,someRandomPort)
+	local dat = (mySocket:getsockname())
+	mySocket:close()
+	return dat
+end
+function net.getExternalIP()
+	local data=http.request("http://whatismyip.org/")
+	return data:match("600;\">(%d-.%d-.%d-.%d-)</span>")
 end
 function net:registerModule(mod,version)
 	if net[mod] then
@@ -60,6 +99,30 @@ function net.setTrigger(funcW,funcE)
 	multi:newTrigger(func)
 end
 net:registerModule("net",net.Version)
+-- Client broadcast
+function net:newCastedClient(name) -- connects to the broadcasted server
+	local listen = socket.udp() -- make a new socket
+	listen:setsockname(net.getLocalIP(), 11111)
+	listen:settimeout(0)
+	local timer=multi:newTimer()
+	while true do
+		local data, ip, port = listen:receivefrom()
+		if timer:Get()>3 then
+			error("Timeout! Server by the name: "..name.." has not been found!")
+		end
+		if data then
+			local n,tp,ip,port=data:match("(%S-)|(%S-)|(%S-):(%d+)")
+			if n:match(name) then
+				print("Found Server!",n,tp,ip,port)
+				if tp=="tcp" then
+					return net:newTCPClient(ip,tonumber(port))
+				else
+					return net:newClient(ip,tonumber(port))
+				end
+			end
+		end
+	end
+end
 -- UDP Stuff
 function net:newServer(port,servercode)
 	local c={}
@@ -82,6 +145,15 @@ function net:newServer(port,servercode)
 	end
 	function c:banIP(ip)
 		table.insert(self.bannedIPs,cid)
+	end
+	c.broad=socket.udp()
+	c.hostip=net.getLocalIP()
+	function c:broadcast(name)
+		local loop=multi:newTLoop(function(dt,loop)
+			self.broad:setoption('broadcast',true)
+			self.broad:sendto(name.."|"..self.Type.."|"..self.hostip..":"..self.port, "255.255.255.255", 11111)
+			self.broad:setoption('broadcast',false)
+		end,1)
 	end
 	function c:send(ip,data,port,cid)
 		if self.autoNormalization then
@@ -154,7 +226,7 @@ function net:newServer(port,servercode)
 				data=net.denormalize(data)
 			end
 			if data:sub(1,4)=="pong" then
-				print("Recieved pong from: "..data:sub(5,-1))
+				--print("Recieved pong from: "..data:sub(5,-1))
 				self.ips[data:sub(5,-1)][3]=os.clock()
 			elseif data:sub(1,2)=="S!" then
 				local cid=self:CIDFrom(ip,port)
@@ -177,8 +249,8 @@ function net:newServer(port,servercode)
 					self.udp:sendto("Make sure your server code is correct!", ip, port)
 				end
 			elseif data:sub(1,2)=="C!" then
-				local hook=data:match("!(.-)!")
-				self.OnDataRecieved:getConnection(hook):Fire(hook,data:sub(11,-1),data:sub(3,10),ip,port)
+				local hook=(data:sub(11,-1)):match("!(.-)!")
+				self.OnDataRecieved:getConnection(hook):Fire(self,data:sub(11,-1),data:sub(3,10),ip,port)
 			elseif data:sub(1,2)=="E!" then
 				self.ips[data:sub(3,10)]=nil
 				obj.ids[data:sub(3,10)]=false
@@ -216,7 +288,7 @@ function net:newServer(port,servercode)
 	c.connectiontest=multi:newAlarm(30)
 	c.connectiontest.link=c
 	c.connectiontest:OnRing(function(alarm)
-		print("pinging clients!")
+		--print("pinging clients!")
 		alarm.link:sendAll("ping")
 		alarm:Reset()
 	end)
@@ -231,8 +303,8 @@ function net:newClient(host,port,servercode,nonluaServer)
 	local c={}
 	c.ip=assert(socket.dns.toip(host))
 	c.udp=assert(socket.udp())
-	c.udp:setpeername(c.ip, port)
 	c.udp:settimeout(0)
+	c.udp:setpeername(c.ip, port)
 	c.cid="NIL"
 	c.lastPing=0
 	c.Type="udp"
@@ -352,6 +424,16 @@ function net:newTCPServer(port)
 	c.updaterRate=1
 	c.autoNormalization=false
 	c.updates={}
+	c.links={}
+	c.broad=socket.udp()
+	c.hostip=net.getLocalIP()
+	function c:broadcast(name)
+		local loop=multi:newTLoop(function(dt,loop)
+			self.broad:setoption('broadcast',true)
+			self.broad:sendto(name.."|"..self.Type.."|"..self.hostip..":"..self.port, "255.255.255.255", 11111)
+			self.broad:setoption('broadcast',false)
+		end,1)
+	end
 	function c:setUpdateRate(n)
 		self.updaterRate=n
 	end
@@ -376,6 +458,12 @@ function net:newTCPServer(port)
 		else
 			handle:send(data)
 		end
+	end
+	function c:sendAllData(handle,data)
+		if self.autoNormalization then
+			data=net.normalize(data)
+		end
+		handle:send(data)
 	end
 	function c:pollClientModules(ip,port)
 		self:send(ip,"L!",port)
@@ -427,6 +515,7 @@ function net:newTCPServer(port)
 						end
 					end
 					self.Link.OnClientClosed:Fire(self.Link,"Client Closed Connection!",self.client,self.client,ip)
+					self.Link.links[self.client]=nil -- lets clean up
 					self:Destroy()
 				end
 				if data then
@@ -438,7 +527,7 @@ function net:newTCPServer(port)
 						return
 					end
 					local hook=data:match("!(.-)!")
-					self.Link.OnDataRecieved:getConnection(hook):Fire(self.Link,data,self.client,self.client,ip)
+					self.Link.OnDataRecieved:getConnection(hook):Fire(self.Link,data,self.client,self.client,ip,self)
 					if data:sub(1,2)=="L!" then
 						cList=data
 						local list={}
@@ -455,6 +544,7 @@ function net:newTCPServer(port)
 			function updater:setReceiveMode(mode)
 				self.rMode=mode
 			end
+			self.links[client]=updater
 		end
 	end
 	c.OnClientsModulesList=multi:newConnection()
@@ -491,7 +581,6 @@ function net:newTCPClient(host,port)
 		self.sMode=mode
 	end
 	function c:send(data)
-		if not self.tcp then return end
 		if self.autoNormalization then
 			data=net.normalize(data)
 		end
@@ -509,7 +598,6 @@ function net:newTCPClient(host,port)
 		end
 	end
 	function c:sendRaw(data)
-		if not self.tcp then return end
 		if self.autoNormalization then
 			data=net.normalize(data)
 		end
@@ -542,21 +630,21 @@ function net:newTCPClient(host,port)
 			self.OnDataRecieved:getConnection(hook):Fire(self,data)
 		end
 	end
-	c.reconnect=multi:newFunction(function(func,self)
-		self.tcp=socket.connect(self.ip,self.port)
-		if self.tcp==nil then
-			print("Can't connect to the server: No response from server!")
-			func:hold(3)
-			self:reconnect()
-			func=nil
-			return
-		end
-		self.OnConnectionRegained:Fire(self)
-		self.tcp:settimeout(0)
-		--self.tcp:setoption('tcp-nodelay', true)
-		self.tcp:setoption('keepalive', true)
-		func=nil
-	end)
+	function c:reconnect()
+		multi:newFunction(function(func)
+			self.tcp=socket.connect(self.ip,self.port)
+			if self.tcp==nil then
+				print("Can't connect to the server: No response from server!")
+				func:hold(3)
+				self:reconnect()
+				return
+			end
+			self.OnConnectionRegained:Fire(self)
+			self.tcp:settimeout(0)
+			--self.tcp:setoption('tcp-nodelay', true)
+			self.tcp:setoption('keepalive', true)
+		end)
+	end
 	c.event=multi:newEvent(function(event)
 		return event.link:IDAssigned()
 	end)

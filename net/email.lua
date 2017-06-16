@@ -1,7 +1,8 @@
 require("net.identity")
 net:registerModule("email",{1,0,0})
+-- needs rewriting, where it uses the identity module and can send an email. EX: server:email(user,subject,body)
 smtp = require 'socket.smtp'
-ssl = require 'ssl'
+ssl = require 'ssl' --  server side only so noworries for love2d users
 
 function net.email.init(from,user,pass)
 	net.OnServerCreated:connect(function(s)
