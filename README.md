@@ -22,6 +22,7 @@ A simple and powerful way to make servers and clients
 - [ ] IPV6 Support
 - [ ] Multicast support
 - [ ] Clean up modules
+- [ ] Improve server ban features
 - [ ] Improve 'stable' modules
 - [ ] AUDP - advance udp. Ensures packets arrive and handles late packets.
 - [ ] P2P - peer to peer (Server to set up initial connection)
@@ -118,6 +119,55 @@ The net library also provides a powerful module creation interface. You have all
 - net:newClient(host,port,servercode,nonluaServer) -- creates a UDP Client
 - net:newTCPServer(port) -- creates a TCP Server
 - net:newTCPClient(host,port) -- creates a TCP Client
+
+Both TCP/UPD Clients and Servers contain the same methods:
+Server Object:
+# General Server Methods
+- serverobj:setUpdateRate(n)
+- server:banCID(cid)
+- server:banIP(ip)
+- server:broadcast(name)
+- server:send(ip,data,port,cid)
+- server:pollClientModules(ip,port)
+- server:CIDFrom(ip,port)
+- server:sendAll(data)
+- server:sendAllBut(data,cid)
+- server:clientRegistered(cid)
+- server:clientLoggedIn(cid)
+- server:update() -- Internal method do not call!
+- server.OnClientsModulesList()
+- server.OnDataRecieved()
+- server.OnClientClosed()
+- server.OnClientConnected()
+- server.hostip=net.getLocalIP()
+- server.port
+
+# TCP Server Only Methods
+- server:setReceiveMode(mode)
+- server:setSendMode(mode)
+- server:sendAllData(handle,data)
+- server:getUpdater(cid)
+
+# General Client Methods
+- client:send(data)
+- client:sendRaw(data)
+- client:close()
+- client:getCID()
+- client:update() -- Internal method do not call!
+- client:reconnect()
+- client:IDAssigned()
+- client.OnDataRecieved()
+- client.OnClientReady()
+- client.OnClientDisconnected()
+- client.OnConnectionRegained()
+
+# UDP Client Only Methods
+- client.OnPingRecieved()
+- client.OnServerNotAvailable
+
+# TCP Client Only Methods
+- client:setReceiveMode(mode)
+- client:setSendMode(mode)
 
 When using the module creation support here is the shell that you can use:
 ```lua
