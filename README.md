@@ -3,7 +3,7 @@ Updated from 2.0.0 to 2.0.1
 Added:
 - Examples
 - Support for latest multi version
-- Thats about it
+- Updated readme
 
 
 # Discord
