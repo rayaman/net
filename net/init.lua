@@ -1,9 +1,9 @@
 --[[
 	UPCOMMING ADDITIONS
-	AUDP - advance udp/ Ensures packets arrive and handles late packets.
+	AUDP - advance udp. Ensures packets arrive and handles late packets.
 	P2P - peer to peer (Server to set up initial connection)
 	Relay - offput server load (locally)
-	Threading - Simple threading (UDP/AUDP Only)
+	Threading - Simple threading ~~(UDP/AUDP Only)~~ Thanks to an updated multi library we can thread with ease
 	Priority handling
 ]]
 --[[
@@ -31,8 +31,8 @@ socket=require("socket")
 http=require("socket.http")
 mime=require("mime")
 net={}
-net.Version={2,0,0} -- This will probably stay this version for quite a while... The modules on the otherhand will be more inconsistant
-net._VERSION="2.0.0"
+net.Version={2,0,1} -- This will probably stay this version for quite a while... The modules on the otherhand will be more inconsistant
+net._VERSION="2.0.1"
 net.OnServerCreated=multi:newConnection()
 net.OnClientCreated=multi:newConnection()
 net.loadedModules={}
@@ -149,7 +149,7 @@ function net:newServer(port,servercode)
 	c.broad=socket.udp()
 	c.hostip=net.getLocalIP()
 	function c:broadcast(name)
-		local loop=multi:newTLoop(function(dt,loop)
+		local loop=multi:newTLoop(function(loop,dt)
 			self.broad:setoption('broadcast',true)
 			self.broad:sendto(name.."|"..self.Type.."|"..self.hostip..":"..self.port, "255.255.255.255", 11111)
 			self.broad:setoption('broadcast',false)
@@ -428,7 +428,7 @@ function net:newTCPServer(port)
 	c.broad=socket.udp()
 	c.hostip=net.getLocalIP()
 	function c:broadcast(name)
-		local loop=multi:newTLoop(function(dt,loop)
+		local loop=multi:newTLoop(function(loop,dt)
 			self.broad:setoption('broadcast',true)
 			self.broad:sendto(name.."|"..self.Type.."|"..self.hostip..":"..self.port, "255.255.255.255", 11111)
 			self.broad:setoption('broadcast',false)
