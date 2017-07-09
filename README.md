@@ -30,6 +30,8 @@ A simple and powerful way to make servers and clients
 - [ ] Threading - Simple threading ~~(UDP/AUDP Only)~~ Thanks to an updated multi library we can thread with ease
 - [ ] Priority handling
 
+# Note
+You will see a bunch of files inside of the net folder. All that is stable is the init.lua and sft.lua file. Everything else is a work in progress. Plus I am planning on rewritting all of the modules to take advantage of the new threading features that are found in the new multi updates. PRogress on this will be made soon. I have just been away from my PC for a while.
 # Usage
 server.lua
 ```lua
