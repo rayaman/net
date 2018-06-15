@@ -47,10 +47,12 @@ local mime=require("mime")
 --https=require("ssl.https")
 local net={}
 net.Version={2,0,1} -- This will probably stay this version for quite a while... The modules on the otherhand will be more inconsistant
-net._VERSION="2.0.1"
+net._VERSION="3.0.0"
+net.ClientCache = {}
 net.OnServerCreated=multi:newConnection()
 net.OnClientCreated=multi:newConnection()
 net.loadedModules={}
+net.OnCastedClientInfo=multi:newConnection()
 net.autoInit=true
 net.generateGUID = function(t)
 	local pass = {}
@@ -154,6 +156,32 @@ function net:newCastedClient(name) -- connects to the broadcasted server
 			end
 		end
 	end
+end
+function net:newCastedClients(name) -- connects to the broadcasted server
+	local listen = socket.udp() -- make a new socket
+	listen:setsockname(net.getLocalIP(), 11111)
+	listen:settimeout(0)
+	local timer=multi:newTimer()
+	multi:newTLoop(function(self)
+		local data, ip, port = listen:receivefrom()
+		if data and not net.ClientCache[data] then
+			local n,tp,ip,port=data:match("(%S-)|(%S-)|(%S-):(%d+)")
+			if n:match(name) then
+				local capture = n:match(name)
+				local client = {}
+				if tp=="tcp" then
+					client=net:newTCPClient(ip,tonumber(port))
+				else
+					client=net:newUDPClient(ip,tonumber(port))
+				end
+				net.OnCastedClientInfo:Fire(client,n,ip,port)
+				net.ClientCache[data]=client -- we only want this to trigger once so lets add it to our list of clients
+			end
+		end
+	end,1)
+end
+function net:getClient(name)
+	
 end
 -- UDP Stuff
 function net:newUDPServer(port,servercode,nonluaServer)
