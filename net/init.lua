@@ -452,10 +452,12 @@ function net:newUDPClient(host,port,servercode,nonluaServer)
 	c.OnClientDisconnected=multi:newConnection()
 	c.OnConnectionRegained=multi:newConnection()
 	c.notConnected=multi:newFunction(function(self)
-		self:hold(3)
-		if self.link:IDAssigned()==false then
-			self.link.OnServerNotAvailable:Fire("Can't connect to the server: no response from server")
-		end
+		multi:newAlarm(3):OnRing(function(alarm)
+			if self.link:IDAssigned()==false then
+				self.link.OnServerNotAvailable:Fire("Can't connect to the server: no response from server")
+			end
+			alarm:Destroy()
+		end)
 	end)
 	c.notConnected.link=c
 	if not nonluaServer then
@@ -695,9 +697,10 @@ function net:newTCPClient(host,port)
 			self.tcp=socket.connect(self.ip,self.port)
 			if self.tcp==nil then
 				print("Can't connect to the server: No response from server!")
-				func:hold(3)
-				self:reconnect()
-				return
+				multi:newAlarm(3):OnRing(function(alarm)
+					self:reconnect()
+					return
+				end)
 			end
 			self.OnConnectionRegained:Fire(self)
 			self.tcp:settimeout(0)
