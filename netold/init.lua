@@ -27,48 +27,18 @@ function string.trim(s)
 	local from = s:match"^%s*()"
 	return from > #s and "" or s:match(".*%S", from)
 end
-local guid = {}
-local char = {}
-for i = 48,57 do
-	char[#char+1]=string.char(i)
-end
-for i = 65,90 do
-	char[#char+1]=string.char(i)
-end
-for i = 97,122 do
-	char[#char+1]=string.char(i)
-end
-local isHyphen = {[9]=1,[14]=1,[19]=1,[24]=1}
-math.randomseed(os.time())
-local socket=require("socket")
-local http=require("socket.http")
-local mime=require("mime")
---ssl=require("ssl")
---https=require("ssl.https")
-local net={}
+socket=require("socket")
+http=require("socket.http")
+mime=require("mime")
+ssl=require("ssl")
+https=require("ssl.https")
+net={}
 net.Version={2,0,1} -- This will probably stay this version for quite a while... The modules on the otherhand will be more inconsistant
 net._VERSION="2.0.1"
 net.OnServerCreated=multi:newConnection()
 net.OnClientCreated=multi:newConnection()
 net.loadedModules={}
 net.autoInit=true
-net.generateGUID = function(t)
-	local pass = {}
-	local a=0
-	local x=""
-	for z = 1,36 do
-		if isHyphen[z] then
-			x='-'
-		else
-			 a = math.random(1,#char)
-			 x = char[a]
-		end
-		table.insert(pass, x)
-		if t == z then break end
-	end
-	z = nil
-	return tostring(table.concat(pass))
-end
 function net.normalize(input)
 	local enc=mime.b64(input)
 	return enc
@@ -87,8 +57,8 @@ function net.getLocalIP()
 	return dat
 end
 function net.getExternalIP()
-	local data=http.request("http://whatismyip.host")
-	return data:match("(%d+.%d+.%d+.%d+)")
+	local data=http.request("http://whatismyip.org/")
+	return data:match("600;\">(%d-.%d-.%d-.%d-)</span>")
 end
 function net:registerModule(mod,version)
 	if net[mod] then
@@ -156,7 +126,7 @@ function net:newCastedClient(name) -- connects to the broadcasted server
 	end
 end
 -- UDP Stuff
-function net:newUDPServer(port,servercode,nonluaServer)
+function net:newServer(port,servercode)
 	local c={}
 	c.udp=assert(socket.udp())
 	c.udp:settimeout(0)
@@ -331,7 +301,7 @@ function net:newUDPServer(port,servercode,nonluaServer)
 	return c
 end
 
-function net:newUDPClient(host,port,servercode,nonluaServer)
+function net:newClient(host,port,servercode,nonluaServer)
 	local c={}
 	c.ip=assert(socket.dns.toip(host))
 	c.udp=assert(socket.udp())
@@ -570,7 +540,7 @@ function net:newTCPServer(port)
 					end
 				end
 			end)
-			updater:SetSkip(self.updaterRate)
+			updater:setSkip(self.updaterRate)
 			updater.client=client
 			updater.Link=self
 			function updater:setReceiveMode(mode)
@@ -694,4 +664,3 @@ function net:newTCPClient(host,port)
 	net.OnClientCreated:Fire(c)
 	return c
 end
-return net

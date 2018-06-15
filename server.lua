@@ -1,0 +1,10 @@
+package.path="?/init.lua;"..package.path
+require("multi")
+require("net")
+server = net:newUDPServer(12345)
+print("Server hosted on "..net.getExternalIP().." listening on port: 12345")
+server.OnDataRecieved(function(self,data,cid,ip,port)
+	print(data)
+	self:send(ip,"Hello Client! "..net.generateGUID(),port,cid)
+end)
+multi:mainloop()
