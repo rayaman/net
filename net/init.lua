@@ -178,10 +178,7 @@ function net:newCastedClients(name) -- connects to the broadcasted server
 				net.ClientCache[data]=client -- we only want this to trigger once so lets add it to our list of clients
 			end
 		end
-	end,1)
-end
-function net:getClient(name)
-	
+	end,.1)
 end
 -- UDP Stuff
 function net:newUDPServer(port,servercode,nonluaServer)
