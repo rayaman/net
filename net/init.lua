@@ -47,10 +47,12 @@ local mime=require("mime")
 --https=require("ssl.https")
 local net={}
 net.Version={2,0,1} -- This will probably stay this version for quite a while... The modules on the otherhand will be more inconsistant
-net._VERSION="2.0.1"
+net._VERSION="3.0.0"
+net.ClientCache = {}
 net.OnServerCreated=multi:newConnection()
 net.OnClientCreated=multi:newConnection()
 net.loadedModules={}
+net.OnCastedClientInfo=multi:newConnection()
 net.autoInit=true
 net.generateGUID = function(t)
 	local pass = {}
@@ -155,6 +157,29 @@ function net:newCastedClient(name) -- connects to the broadcasted server
 		end
 	end
 end
+function net:newCastedClients(name) -- connects to the broadcasted server
+	local listen = socket.udp() -- make a new socket
+	listen:setsockname(net.getLocalIP(), 11111)
+	listen:settimeout(0)
+	local timer=multi:newTimer()
+	multi:newTLoop(function(self)
+		local data, ip, port = listen:receivefrom()
+		if data then
+			local n,tp,ip,port=data:match("(%S-)|(%S-)|(%S-):(%d+)")
+			if n:match(name) and not net.ClientCache[n] then
+				local capture = n:match(name)
+				local client = {}
+				if tp=="tcp" then
+					client=net:newTCPClient(ip,tonumber(port))
+				else
+					client=net:newUDPClient(ip,tonumber(port))
+				end
+				net.ClientCache[n]=client
+				net.OnCastedClientInfo:Fire(client,n,ip,port)
+			end
+		end
+	end,.1)
+end
 -- UDP Stuff
 function net:newUDPServer(port,servercode,nonluaServer)
 	local c={}
@@ -163,7 +188,9 @@ function net:newUDPServer(port,servercode,nonluaServer)
 	c.udp:setsockname("*", port)
 	c.ips={}
 	c.Type="udp"
-	c.port=port
+	if port == 0 then
+		_, c.port = c.udp:getsockname()
+	end
 	c.ids={}
 	c.servercode=servercode
 	c.bannedIPs={}
@@ -424,10 +451,12 @@ function net:newUDPClient(host,port,servercode,nonluaServer)
 	c.OnClientDisconnected=multi:newConnection()
 	c.OnConnectionRegained=multi:newConnection()
 	c.notConnected=multi:newFunction(function(self)
-		self:hold(3)
-		if self.link:IDAssigned()==false then
-			self.link.OnServerNotAvailable:Fire("Can't connect to the server: no response from server")
-		end
+		multi:newAlarm(3):OnRing(function(alarm)
+			if self.link:IDAssigned()==false then
+				self.link.OnServerNotAvailable:Fire("Can't connect to the server: no response from server")
+			end
+			alarm:Destroy()
+		end)
 	end)
 	c.notConnected.link=c
 	if not nonluaServer then
@@ -447,7 +476,9 @@ function net:newTCPServer(port)
 	c.tcp:settimeout(0)
 	c.ip,c.port=c.tcp:getsockname()
 	c.ips={}
-	c.port=port
+	if port == 0 then
+		_, c.port = c.udp:getsockname()
+	end
 	c.ids={}
 	c.bannedIPs={}
 	c.Type="tcp"
@@ -592,7 +623,6 @@ end
 function net:newTCPClient(host,port)
 	local c={}
 	c.ip=assert(socket.dns.toip(host))
-	c.port=port
 	c.tcp=socket.connect(c.ip,port)
 	if not c.tcp then
 		print("Can't connect to the server: no response from server")
@@ -667,9 +697,10 @@ function net:newTCPClient(host,port)
 			self.tcp=socket.connect(self.ip,self.port)
 			if self.tcp==nil then
 				print("Can't connect to the server: No response from server!")
-				func:hold(3)
-				self:reconnect()
-				return
+				multi:newAlarm(3):OnRing(function(alarm)
+					self:reconnect()
+					return
+				end)
 			end
 			self.OnConnectionRegained:Fire(self)
 			self.tcp:settimeout(0)
