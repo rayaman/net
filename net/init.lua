@@ -164,9 +164,9 @@ function net:newCastedClients(name) -- connects to the broadcasted server
 	local timer=multi:newTimer()
 	multi:newTLoop(function(self)
 		local data, ip, port = listen:receivefrom()
-		if data and not net.ClientCache[data] then
+		if data then
 			local n,tp,ip,port=data:match("(%S-)|(%S-)|(%S-):(%d+)")
-			if n:match(name) then
+			if n:match(name) and not net.ClientCache[n] then
 				local capture = n:match(name)
 				local client = {}
 				if tp=="tcp" then
@@ -174,8 +174,8 @@ function net:newCastedClients(name) -- connects to the broadcasted server
 				else
 					client=net:newUDPClient(ip,tonumber(port))
 				end
+				net.ClientCache[n]=client
 				net.OnCastedClientInfo:Fire(client,n,ip,port)
-				net.ClientCache[data]=client -- we only want this to trigger once so lets add it to our list of clients
 			end
 		end
 	end,.1)
@@ -188,7 +188,9 @@ function net:newUDPServer(port,servercode,nonluaServer)
 	c.udp:setsockname("*", port)
 	c.ips={}
 	c.Type="udp"
-	c.port=port
+	if port == 0 then
+		_, c.port = c.udp:getsockname()
+	end
 	c.ids={}
 	c.servercode=servercode
 	c.bannedIPs={}
@@ -474,7 +476,9 @@ function net:newTCPServer(port)
 	c.tcp:settimeout(0)
 	c.ip,c.port=c.tcp:getsockname()
 	c.ips={}
-	c.port=port
+	if port == 0 then
+		_, c.port = c.udp:getsockname()
+	end
 	c.ids={}
 	c.bannedIPs={}
 	c.Type="tcp"
@@ -619,7 +623,6 @@ end
 function net:newTCPClient(host,port)
 	local c={}
 	c.ip=assert(socket.dns.toip(host))
-	c.port=port
 	c.tcp=socket.connect(c.ip,port)
 	if not c.tcp then
 		print("Can't connect to the server: no response from server")
