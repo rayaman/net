@@ -40,13 +40,14 @@ for i = 97,122 do
 end
 local isHyphen = {[9]=1,[14]=1,[19]=1,[24]=1}
 math.randomseed(os.time())
+local multi = require("multi")
 local socket=require("socket")
 local http=require("socket.http")
 local mime=require("mime")
 --ssl=require("ssl")
 --https=require("ssl.https")
 local net={}
-net.Version={2,0,1} -- This will probably stay this version for quite a while... The modules on the otherhand will be more inconsistant
+net.Version={3,0,0} -- This will probably stay this version for quite a while... The modules on the otherhand will be more inconsistant
 net._VERSION="3.0.0"
 net.ClientCache = {}
 net.OnServerCreated=multi:newConnection()
