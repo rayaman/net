@@ -469,9 +469,6 @@ function net:newUDPClient(host,port,servercode,nonluaServer)
 	net.OnClientCreated:Fire(c)
 	return c
 end
-multi:newThread(function()
-	
-end)
 --TCP Stuff
 function net:newTCPClientObject(fd)
 	local c = {}
