@@ -55,6 +55,8 @@ net.OnClientCreated=multi:newConnection()
 net.loadedModules={}
 net.OnCastedClientInfo=multi:newConnection()
 net.autoInit=true
+net.ConnectionDriver = {}
+net.BroadcastDriver = {}
 net.generateGUID = function(t)
 	local pass = {}
 	local a=0
@@ -146,6 +148,7 @@ function net:newCastedClient(name) -- connects to the broadcasted server
 			error("Timeout! Server by the name: "..name.." has not been found!")
 		end
 		if data then
+			print("found!",data)
 			local n,tp,ip,port=data:match("(%S-)|(%S-)|(%S-):(%d+)")
 			if n:match(name) then
 				print("Found Server!",n,tp,ip,port)
@@ -162,7 +165,6 @@ function net:newCastedClients(name) -- connects to the broadcasted server
 	local listen = socket.udp() -- make a new socket
 	listen:setsockname(net.getLocalIP(), 11111)
 	listen:settimeout(0)
-	local timer=multi:newTimer()
 	multi:newTLoop(function(self)
 		local data, ip, port = listen:receivefrom()
 		if data then
@@ -179,7 +181,7 @@ function net:newCastedClients(name) -- connects to the broadcasted server
 				net.OnCastedClientInfo:Fire(client,n,ip,port)
 			end
 		end
-	end,.1)
+	end,.1):setName("net.castedTask")
 end
 -- UDP Stuff
 function net:newUDPServer(port,servercode,nonluaServer)
@@ -209,11 +211,11 @@ function net:newUDPServer(port,servercode,nonluaServer)
 	c.broad=socket.udp()
 	c.hostip=net.getLocalIP()
 	function c:broadcast(name)
-		local loop=multi:newTLoop(function(loop,dt)
+		table.insert(net.BroadcastDriver,function(loop,dt)
 			self.broad:setoption('broadcast',true)
 			self.broad:sendto(name.."|"..self.Type.."|"..self.hostip..":"..self.port, "255.255.255.255", 11111)
 			self.broad:setoption('broadcast',false)
-		end,1)
+		end)
 	end
 	function c:send(ip,data,port,cid)
 		if self.autoNormalization then
@@ -278,7 +280,7 @@ function net:newUDPServer(port,servercode,nonluaServer)
 	function c:update()
 		local data,ip,port=self.udp:receivefrom()
 		if net.inList(self.bannedIPs,ip) or net.inList(self.bannedCIDs,cid) then
-			print("We will ingore data from a banned client!")
+			print("We will ignore data from a banned client!")
 			return
 		end
 		if data then
@@ -345,20 +347,17 @@ function net:newUDPServer(port,servercode,nonluaServer)
 	c.OnDataRecieved=multi:newConnection()
 	c.OnClientClosed=multi:newConnection()
 	c.OnClientConnected=multi:newConnection()
-	c.connectiontest=multi:newAlarm(30)
+	c.connectiontest=multi:newAlarm(30):setName("net.pingOutTask")
 	c.connectiontest.link=c
 	c.connectiontest:OnRing(function(alarm)
-		--print("pinging clients!")
 		alarm.link:sendAll("ping")
 		alarm:Reset()
 	end)
-	multi:newLoop(function()
-		c:update()
-	end)
+	table.insert(net.ConnectionDriver,c)
 	net.OnServerCreated:Fire(c)
 	return c
 end
-
+local pingManager = {}
 function net:newUDPClient(host,port,servercode,nonluaServer)
 	local c={}
 	c.ip=assert(socket.dns.toip(host))
@@ -431,6 +430,7 @@ function net:newUDPClient(host,port,servercode,nonluaServer)
 			self.cid="NIL"
 			c.udp:send("I!")
 		end
+		self.pingEvent:Resume()
 		self.OnConnectionRegained:Fire(self)
 	end
 	c.pingEvent=multi:newEvent(function(self) return self.link:pollPing() end)
@@ -443,7 +443,8 @@ function net:newUDPClient(host,port,servercode,nonluaServer)
 			self.link.OnServerNotAvailable:Fire("Connection to server lost: ping timeout!")
 			self.link.OnClientDisconnected:Fire(self,"closed")
 		end
-	end)
+		self:Pause()
+	end):setName("net.pingInTask")
 	c.pingEvent.link=c
 	c.OnPingRecieved=multi:newConnection()
 	c.OnDataRecieved=multi:newConnection()
@@ -457,28 +458,126 @@ function net:newUDPClient(host,port,servercode,nonluaServer)
 				self.link.OnServerNotAvailable:Fire("Can't connect to the server: no response from server")
 			end
 			alarm:Destroy()
-		end)
+		end):setName("net.clientTimeout")
 	end)
 	c.notConnected.link=c
 	if not nonluaServer then
 		c.udp:send("I!")
 	end
-	multi:newLoop(function()
-		c:update()
-	end)
-	multi:newJob(function() c.notConnected() end)
+	table.insert(net.ConnectionDriver,c)
+	multi.nextStep(function() c.notConnected() end)
 	net.OnClientCreated:Fire(c)
 	return c
 end
+multi:newThread(function()
+	
+end)
 --TCP Stuff
+function net:newTCPClientObject(fd)
+	local c = {}
+	local client
+	c.Type="tcp-ClientObj"
+	c.rMode="*l"
+	c.sMode="*l"
+	function c:packMsg(data)
+		local temp = bin.new()
+		temp:addBlock(#data,self.numspace,"n")
+		temp:addBlock(data)
+		return temp:getData()
+	end
+	function c:enableBinaryMode()
+		self.rMode = "b"
+		self.sMode = "b"
+	end
+	if fd then
+		client=socket.tcp()
+		client:setfd(fd)
+		_,port = client:getsockname()
+		c.handle = client
+	else
+		error("You need to enter a fd in order to be able to create a tcp client object like this!")
+	end
+	function c:setUpdateRate(n)
+		self.updaterRate=n
+	end
+	function c:setReceiveMode(mode)
+		self.rMode=mode
+	end
+	function c:setSendMode(mode)
+		self.rMode=mode
+	end
+	function c:send(data)
+		if self.autoNormalization then
+			data=net.normalize(data)
+		end
+		if self.sMode=="*l" then
+			self.handle:send(data.."\n")
+		elseif self.sMode=="b" then
+			self.handle:send(self:packMsg(data))
+		else
+			self.handle:send(data)
+		end
+	end
+	multi:newThread("ServerClientHandler",function()
+		while true do
+			thread.skip(1)
+			local data, err, dat, len
+			if self.rMode == "b" then
+				thread.hold(function()
+					dat = client:receive(self.numspace)
+					return dat
+				end)
+				len = bin.new(dat):getBlock("n",self.numspace)
+				data, err = client:receive(len)
+			else
+				data, err = client:receive(self.rMode)
+			end
+			if err=="closed" then
+				for i=1,#self.ips do
+					if self.ips[i]==client then
+						table.remove(self.ips,i)
+					end
+				end
+				self.OnClientClosed:Fire(self,"Client Closed Connection!",client,client,ip)
+				self.links[client]=nil -- lets clean up
+				self:Destroy()
+			end
+			if data then
+				if self.autoNormalization then
+					data=net.denormalize(data)
+				end
+				if net.inList(self.bannedIPs,ip) then
+					print("We will ingore data from a banned client!")
+					return
+				end
+				local hook=data:match("!(.-)!")
+				self.OnDataRecieved:getConnection(hook):Fire(self,data,client,client,ip,self)
+				if data:sub(1,2)=="L!" then
+					cList=data
+					local list={}
+					for m,v in cList:gmatch("(%S-):(%S-)|") do
+						list[m]=v
+					end
+					self.OnClientsModulesList:Fire(list,client,client,ip)
+				end
+			end
+		end
+	end)
+	c.OnClientsModulesList=multi:newConnection()
+	c.OnDataRecieved=multi:newConnection()
+	c.OnClientClosed=multi:newConnection()
+	c.OnClientConnected=multi:newConnection()
+	return c
+end
 function net:newTCPServer(port)
 	local c={}
+	local port = port or 0
 	c.tcp=assert(socket.bind("*", port))
 	c.tcp:settimeout(0)
 	c.ip,c.port=c.tcp:getsockname()
 	c.ips={}
 	if port == 0 then
-		_, c.port = c.udp:getsockname()
+		_, c.port = c.tcp:getsockname()
 	end
 	c.ids={}
 	c.bannedIPs={}
@@ -489,14 +588,25 @@ function net:newTCPServer(port)
 	c.autoNormalization=false
 	c.updates={}
 	c.links={}
+	c.numspace = 4
 	c.broad=socket.udp()
 	c.hostip=net.getLocalIP()
+	function c:packMsg(data)
+		local temp = bin.new()
+		temp:addBlock(#data,self.numspace,"n")
+		temp:addBlock(data)
+		return temp:getData()
+	end
+	function c:enableBinaryMode()
+		self.rMode = "b"
+		self.sMode = "b"
+	end
 	function c:broadcast(name)
-		local loop=multi:newTLoop(function(loop,dt)
+		table.insert(net.BroadcastDriver,function(loop,dt)
 			self.broad:setoption('broadcast',true)
 			self.broad:sendto(name.."|"..self.Type.."|"..self.hostip..":"..self.port, "255.255.255.255", 11111)
 			self.broad:setoption('broadcast',false)
-		end,1)
+		end)
 	end
 	function c:setUpdateRate(n)
 		self.updaterRate=n
@@ -519,6 +629,8 @@ function net:newTCPServer(port)
 		end
 		if self.sMode=="*l" then
 			handle:send(data.."\n")
+		elseif self.sMode=="b" then
+			handle:send(self:packMsg(data))
 		else
 			handle:send(data)
 		end
@@ -567,57 +679,70 @@ function net:newTCPServer(port)
 		ip,port=client:getpeername()
 		if ip and port then
 			print("Got connection from: ",ip,port)
-			local updater=multi:newUpdater(skip)
-			self.updates[client]=updater
-			self.OnClientConnected:Fire(self,self.client,self.client,ip)
-			updater:OnUpdate(function(self)
-				local data, err = self.client:receive(self.rMode or self.Link.rMode)
-				if err=="closed" then
-					for i=1,#self.Link.ips do
-						if self.Link.ips[i]==self.client then
-							table.remove(self.Link.ips,i)
+			-- local updater=multi:newUpdater(skip):setName("net.tcpClientObj")
+			-- self.updates[client]=updater
+			self.OnClientConnected:Fire(self,client,client,ip)
+			--updater:OnUpdate(function(self)
+			multi:newThread("ServerClientHandler",function()
+				while true do
+					thread.skip(1)
+					local data, err, dat, len
+					if self.rMode == "b" then
+						thread.hold(function()
+							dat = client:receive(self.numspace)
+							return dat
+						end)
+						len = bin.new(dat):getBlock("n",self.numspace)
+						data, err = client:receive(len)
+					else
+						data, err = client:receive(self.rMode)
+					end
+					if err=="closed" then
+						for i=1,#self.ips do
+							if self.ips[i]==client then
+								table.remove(self.ips,i)
+							end
 						end
+						self.OnClientClosed:Fire(self,"Client Closed Connection!",client,client,ip)
+						self.links[client]=nil -- lets clean up
+						self:Destroy()
+						thread.kill()
 					end
-					self.Link.OnClientClosed:Fire(self.Link,"Client Closed Connection!",self.client,self.client,ip)
-					self.Link.links[self.client]=nil -- lets clean up
-					self:Destroy()
-				end
-				if data then
-					if self.autoNormalization then
-						data=net.denormalize(data)
-					end
-					if net.inList(self.Link.bannedIPs,ip) then
-						print("We will ingore data from a banned client!")
-						return
-					end
-					local hook=data:match("!(.-)!")
-					self.Link.OnDataRecieved:getConnection(hook):Fire(self.Link,data,self.client,self.client,ip,self)
-					if data:sub(1,2)=="L!" then
-						cList=data
-						local list={}
-						for m,v in cList:gmatch("(%S-):(%S-)|") do
-							list[m]=v
+					if data then
+						if self.autoNormalization then
+							data=net.denormalize(data)
 						end
-						self.Link.OnClientsModulesList:Fire(list,self.client,self.client,ip)
+						if net.inList(self.bannedIPs,ip) then
+							print("We will ingore data from a banned client!")
+							return
+						end
+						local hook=data:match("!(.-)!")
+						self.OnDataRecieved:getConnection(hook):Fire(self,data,client,client,ip,self)
+						if data:sub(1,2)=="L!" then
+							cList=data
+							local list={}
+							for m,v in cList:gmatch("(%S-):(%S-)|") do
+								list[m]=v
+							end
+							self.OnClientsModulesList:Fire(list,client,client,ip)
+						end
 					end
 				end
 			end)
-			updater:SetSkip(self.updaterRate)
-			updater.client=client
-			updater.Link=self
-			function updater:setReceiveMode(mode)
-				self.rMode=mode
-			end
-			self.links[client]=updater
+			-- updater:SetSkip(self.updaterRate)
+			-- updater.client=client
+			-- updater.Link=self
+			-- function updater:setReceiveMode(mode)
+				-- self.rMode=mode
+			-- end
+			-- self.links[client]=updater
 		end
 	end
 	c.OnClientsModulesList=multi:newConnection()
 	c.OnDataRecieved=multi:newConnection()
 	c.OnClientClosed=multi:newConnection()
 	c.OnClientConnected=multi:newConnection()
-	multi:newLoop(function()
-		c:update()
-	end)
+	table.insert(net.ConnectionDriver,c)
 	net.OnServerCreated:Fire(c)
 	return c
 end
@@ -637,11 +762,22 @@ function net:newTCPClient(host,port)
 	c.rMode="*l"
 	c.sMode="*l"
 	c.autoNormalization=false
+	c.numspace = 4
+	function c:enableBinaryMode()
+		self.rMode = "b"
+		self.sMode = "b"
+	end
 	function c:setReceiveMode(mode)
 		self.rMode=mode
 	end
 	function c:setSendMode(mode)
 		self.sMode=mode
+	end
+	function c:packMsg(data)
+		local temp = bin.new()
+		temp:addBlock(#data,self.numspace)
+		temp:addBlock(data)
+		return temp:getData()
 	end
 	function c:send(data)
 		if self.autoNormalization then
@@ -649,6 +785,8 @@ function net:newTCPClient(host,port)
 		end
 		if self.sMode=="*l" then
 			ind,err=self.tcp:send(data.."\n")
+		elseif self.sMode=="b" then
+			ind,err=self.tcp:send(self:packMsg(data))
 		else
 			ind,err=self.tcp:send(data)
 		end
@@ -677,7 +815,17 @@ function net:newTCPClient(host,port)
 	end
 	function c:update()
 		if not self.tcp then return end
-		local data,err=self.tcp:receive()
+		local data,err,dat
+		if self.rMode == "b" then
+			thread.hold(function()
+				dat = self.tcp:receive(self.numspace)
+				return dat
+			end)
+			len = bin.new(dat):getBlock("n",self.numspace)
+			data, err = self.tcp:receive(len)
+		else
+			data,err = self.tcp:receive()
+		end
 		if err=="closed" then
 			self.OnClientDisconnected:Fire(self,err)
 		elseif err=="timeout" then
@@ -700,8 +848,9 @@ function net:newTCPClient(host,port)
 				print("Can't connect to the server: No response from server!")
 				multi:newAlarm(3):OnRing(function(alarm)
 					self:reconnect()
+					alarm:Destroy()
 					return
-				end)
+				end):setName("net.timeoutTask")
 			end
 			self.OnConnectionRegained:Fire(self)
 			self.tcp:settimeout(0)
@@ -711,19 +860,34 @@ function net:newTCPClient(host,port)
 	end
 	c.event=multi:newEvent(function(event)
 		return event.link:IDAssigned()
-	end)
-	c.event:OnEvent(function(event)
+	end):OnEvent(function(event)
 		event.link.OnClientReady:Fire(event.link)
+		event:Destroy()
 	end)
+	c.event:setName("net.handshakeTask")
 	c.event.link=c
 	c.OnClientReady=multi:newConnection()
 	c.OnClientDisconnected=multi:newConnection()
 	c.OnDataRecieved=multi:newConnection()
 	c.OnConnectionRegained=multi:newConnection()
-	multi:newLoop(function()
-		c:update()
-	end)
+	table.insert(net.ConnectionDriver,c)
 	net.OnClientCreated:Fire(c)
 	return c
 end
+net.timer = multi:newTimer():Start()
+multi:newThread("ClientServerHandler",function()
+	while true do
+		thread.skip()
+		for i=1,#net.ConnectionDriver do
+			thread.skip()
+			net.ConnectionDriver[i]:update()
+		end
+		if net.timer:Get()>=1 then
+			for i=1,#net.BroadcastDriver do
+				net.BroadcastDriver[i]()
+			end
+			net.timer:Reset()
+		end
+	end
+end)
 return net
