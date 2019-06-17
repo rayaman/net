@@ -821,7 +821,7 @@ function net:newTCPClient(host,port)
 			len = bin.new(dat):getBlock("n",self.numspace)
 			data, err = self.tcp:receive(len)
 		else
-			data,err = self.tcp:receive()
+			data, err = self.tcp:receive()
 		end
 		if err=="closed" then
 			self.OnClientDisconnected:Fire(self,err)
