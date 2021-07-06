@@ -1,17 +1,12 @@
-package.path="?/init.lua;"..package.path
-local multi = require("multi")
-local net = require("net")
-client = net:newTCPClient("localhost",12345)
-client:enableBinaryMode()
-local file = bin.new()
-client.OnDataRecieved(function(self,data)
-	if data == "END" then
-		file:tofile("test2.mp3")
-		print("File transfered!")
-	else
-		file:tackE(data)
-	end
+package.path = "./?/init.lua;./?.lua;"..package.path
+local net = require("net.udp")
+local client = net:newUDPClient("localhost",12345)
+
+client:send("Test!")
+
+client.OnDataRecieved(function(c,data)
+    print("Response: ",data)
+    --c:send("Testing again!")
 end)
-client.OnClientReady:holdUT() -- waits until the client is ready... You can also connect to this event as well and have code do stuff too
-client:send("Hello Server!")
+
 multi:mainloop()
