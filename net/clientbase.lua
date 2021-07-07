@@ -17,12 +17,14 @@ function client:init(type)
     self.process.Start()
 end
 function client:send(data)
+    local dat = {data = data}
     if self.Type == "udp" then
-        local dat = {data = data}
         self.OnPreSend:Fire(dat)
         self.udp:send(dat.data)
     elseif self.Type == "tcp" then
-        local ind, err = self.tcp:send(data)
+        self.OnPreSend:Fire(dat)
+        self.udp:send(dat.data)
+        local ind, err = self.tcp:send(dat.data)
         if err == "closed" then
             self.OnClientDisconnected:Fire(self,err)
         elseif err == "timeout" then

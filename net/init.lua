@@ -504,101 +504,101 @@ end
 -- 	return c
 -- end
 --TCP Stuff
-function net:newTCPClientObject(fd)
-	local c = {}
-	local client
-	c.Type = "tcp-ClientObj"
-	c.rMode = "*l"
-	c.sMode = "*l"
-	function c:packMsg(data)
-		local temp = bin.new()
-		temp:addBlock(#data, self.numspace, "n")
-		temp:addBlock(data)
-		return temp:getData()
-	end
-	function c:enableBinaryMode()
-		self.rMode = "b"
-		self.sMode = "b"
-	end
-	if fd then
-		client = socket.tcp()
-		client:setfd(fd)
-		_, port = client:getsockname()
-		c.handle = client
-	else
-		error("You need to enter a fd in order to be able to create a tcp client object like this!")
-	end
-	function c:setUpdateRate(n)
-		self.updaterRate = n
-	end
-	function c:setReceiveMode(mode)
-		self.rMode = mode
-	end
-	function c:setSendMode(mode)
-		self.rMode = mode
-	end
-	function c:send(data)
-		if self.autoNormalization then
-			data = net.normalize(data)
-		end
-		if self.sMode == "*l" then
-			self.handle:send(data .. "\n")
-		elseif self.sMode == "b" then
-			self.handle:send(self:packMsg(data))
-		else
-			self.handle:send(data)
-		end
-	end
-	multi:newThread("ServerClientHandler",function()
-		while true do
-			thread.skip(1)
-			local data, err, dat, len
-			if self.rMode == "b" then
-				thread.hold(function()
-					return client:receive(self.numspace)
-				end)
-				len = bin.new(dat):getBlock("n", self.numspace)
-				data, err = client:receive(len)
-			else
-				data, err = client:receive(self.rMode)
-			end
-			if err == "closed" then
-				for i = 1, #self.ips do
-					if self.ips[i] == client then
-						table.remove(self.ips, i)
-					end
-				end
-				self.OnClientClosed:Fire(self, "Client Closed Connection!", client, client, ip)
-				self.links[client] = nil -- lets clean up
-				self:Destroy()
-			end
-			if data then
-				if self.autoNormalization then
-					data = net.denormalize(data)
-				end
-				if net.inList(self.bannedIPs, ip) then
-					--print("We will ingore data from a banned client!")
-					return
-				end
-				local hook = data:match("!(.-)!")
-				self.OnDataRecieved:getConnection(hook):Fire(self, data, client, client, ip, self)
-				if data:sub(1, 2) == "L!" then
-					cList = data
-					local list = {}
-					for m, v in cList:gmatch("(%S-):(%S-)|") do
-						list[m] = v
-					end
-					self.OnClientsModulesList:Fire(list, client, client, ip)
-				end
-			end
-		end
-	end)
-	c.OnClientsModulesList = multi:newConnection()
-	c.OnDataRecieved = multi:newConnection()
-	c.OnClientClosed = multi:newConnection()
-	c.OnClientConnected = multi:newConnection()
-	return c
-end
+-- function net:newTCPClientObject(fd)
+-- 	local c = {}
+-- 	local client
+-- 	c.Type = "tcp-ClientObj"
+-- 	c.rMode = "*l"
+-- 	c.sMode = "*l"
+-- 	function c:packMsg(data)
+-- 		local temp = bin.new()
+-- 		temp:addBlock(#data, self.numspace, "n")
+-- 		temp:addBlock(data)
+-- 		return temp:getData()
+-- 	end
+-- 	function c:enableBinaryMode()
+-- 		self.rMode = "b"
+-- 		self.sMode = "b"
+-- 	end
+-- 	if fd then
+-- 		client = socket.tcp()
+-- 		client:setfd(fd)
+-- 		_, port = client:getsockname()
+-- 		c.handle = client
+-- 	else
+-- 		error("You need to enter a fd in order to be able to create a tcp client object like this!")
+-- 	end
+-- 	function c:setUpdateRate(n)
+-- 		self.updaterRate = n
+-- 	end
+-- 	function c:setReceiveMode(mode)
+-- 		self.rMode = mode
+-- 	end
+-- 	function c:setSendMode(mode)
+-- 		self.rMode = mode
+-- 	end
+-- 	function c:send(data)
+-- 		if self.autoNormalization then
+-- 			data = net.normalize(data)
+-- 		end
+-- 		if self.sMode == "*l" then
+-- 			self.handle:send(data .. "\n")
+-- 		elseif self.sMode == "b" then
+-- 			self.handle:send(self:packMsg(data))
+-- 		else
+-- 			self.handle:send(data)
+-- 		end
+-- 	end
+-- 	multi:newThread("ServerClientHandler",function()
+-- 		while true do
+-- 			thread.skip(1)
+-- 			local data, err, dat, len
+-- 			if self.rMode == "b" then
+-- 				thread.hold(function()
+-- 					return client:receive(self.numspace)
+-- 				end)
+-- 				len = bin.new(dat):getBlock("n", self.numspace)
+-- 				data, err = client:receive(len)
+-- 			else
+-- 				data, err = client:receive(self.rMode)
+-- 			end
+-- 			if err == "closed" then
+-- 				for i = 1, #self.ips do
+-- 					if self.ips[i] == client then
+-- 						table.remove(self.ips, i)
+-- 					end
+-- 				end
+-- 				self.OnClientClosed:Fire(self, "Client Closed Connection!", client, client, ip)
+-- 				self.links[client] = nil -- lets clean up
+-- 				self:Destroy()
+-- 			end
+-- 			if data then
+-- 				if self.autoNormalization then
+-- 					data = net.denormalize(data)
+-- 				end
+-- 				if net.inList(self.bannedIPs, ip) then
+-- 					--print("We will ingore data from a banned client!")
+-- 					return
+-- 				end
+-- 				local hook = data:match("!(.-)!")
+-- 				self.OnDataRecieved:getConnection(hook):Fire(self, data, client, client, ip, self)
+-- 				if data:sub(1, 2) == "L!" then
+-- 					cList = data
+-- 					local list = {}
+-- 					for m, v in cList:gmatch("(%S-):(%S-)|") do
+-- 						list[m] = v
+-- 					end
+-- 					self.OnClientsModulesList:Fire(list, client, client, ip)
+-- 				end
+-- 			end
+-- 		end
+-- 	end)
+-- 	c.OnClientsModulesList = multi:newConnection()
+-- 	c.OnDataRecieved = multi:newConnection()
+-- 	c.OnClientClosed = multi:newConnection()
+-- 	c.OnClientConnected = multi:newConnection()
+-- 	return c
+-- end
 function net:newTCPServer(port)
 	local c = {}
 	local port = port or 0

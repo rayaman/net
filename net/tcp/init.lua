@@ -17,11 +17,24 @@ function net:newTCPClient(host, port)
         while true do
             thread.skip(c.updaterRate)
             local data = thread.hold(function()
-                return c.udp:receive()
-            end)
-            local dat = {data = data}
-            c.OnPreSend:Fire(dat)
-            c.OnDataRecieved:Fire(c,dat.data)
+				local d,err = c.tcp:receive(c.rMode)
+                if not(d) then
+                    if err == "closed" then
+                        c.OnClientDisconnected:Fire(c,err)
+                    elseif err == "timeout" then
+                        c.OnClientDisconnected:Fire(c,err)
+                    else
+                        print(err)
+                    end
+                else
+                    return d
+                end
+			end)
+            if data then
+                local dat = {data = data}
+                c.OnPreRecieved:Fire(dat)
+                c.OnDataRecieved:Fire(c,dat.data)
+            end
         end
     end).OnError(function(a,b,c)
         print(a,b,c)

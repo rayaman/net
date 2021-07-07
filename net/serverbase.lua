@@ -55,8 +55,10 @@ function server:broadcast(name)
     end)
 end
 function server:send(data,cid)
+    local dat = {data = data, cid = cid}
     if self.Type == "udp" then
-        ---
+        self.OnPreSend:Fire(dat)
+        self.udp:sendto(dat.data,dat.cid.ip,dat.cid.port)
     elseif self.Type == "tcp" then
         --
     end

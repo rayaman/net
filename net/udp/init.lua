@@ -23,11 +23,6 @@ function net:newUDPServer(port)
     else
         c.port = port
     end
-    function c:send(data,cid)
-        local dat = {data = data, cid = cid}
-        self.OnPreSend:Fire(dat)
-        self.udp:sendto(dat.data,dat.cid.ip,dat.cid.port)
-    end
     udpcount = udpcount + 1
     c.updateThread = c.process:newThread("UDPServer Thread<"..udpcount..">",function()
         local sideJob = thread:newFunction(function()
@@ -71,9 +66,6 @@ function net:newUDPServer(port)
     end).OnError(function(...)
         print(...)
     end)
-    c.activityMonitor = c.process:newThread("Activity Monitor",function()
-        --
-    end)
     return c
 end
 function net:newUDPClient(host, port)
@@ -91,7 +83,7 @@ function net:newUDPClient(host, port)
                 return c.udp:receive()
             end)
             local dat = {data = data}
-            c.OnPreSend:Fire(dat)
+            c.OnPreRecieved:Fire(dat)
             c.OnDataRecieved:Fire(c,dat.data)
         end
     end)
