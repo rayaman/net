@@ -599,335 +599,335 @@ end
 -- 	c.OnClientConnected = multi:newConnection()
 -- 	return c
 -- end
-function net:newTCPServer(port)
-	local c = {}
-	local port = port or 0
-	c.tcp = assert(socket.bind("*", port))
-	c.tcp:settimeout(0)
-	c.ip, c.port = c.tcp:getsockname()
-	c.ips = {}
-	if port == 0 then
-		_, c.port = c.tcp:getsockname()
-	end
-	c.ids = {}
-	c.bannedIPs = {}
-	c.Type = "tcp"
-	c.rMode = "*l"
-	c.sMode = "*l"
-	c.updaterRate = 1
-	c.autoNormalization = false
-	c.updates = {}
-	c.links = {}
-	c.numspace = 4
-	c.broad = socket.udp()
-	c.hostip = net.getLocalIP()
-	function c:packMsg(data)
-		local temp = bin.new()
-		temp:addBlock(#data, self.numspace, "n")
-		temp:addBlock(data)
-		return temp:getData()
-	end
-	function c:enableBinaryMode()
-		self.rMode = "b"
-		self.sMode = "b"
-	end
-	function c:broadcast(name)
-		table.insert(
-			net.BroadcastDriver,
-			function(loop, dt)
-				self.broad:setoption("broadcast", true)
-				self.broad:sendto(name .. "|" .. self.Type .. "|" .. self.hostip .. ":" .. self.port, "255.255.255.255", 11111)
-				self.broad:setoption("broadcast", false)
-			end
-		)
-	end
-	function c:setUpdateRate(n)
-		self.updaterRate = n
-	end
-	function c:setReceiveMode(mode)
-		self.rMode = mode
-	end
-	function c:setSendMode(mode)
-		self.sMode = mode
-	end
-	function c:banCID(cid)
-		--print("Function not supported on a tcp server!")
-	end
-	function c:banIP(ip)
-		table.insert(self.bannedIPs, cid)
-	end
-	function c:send(handle, data)
-		if self.autoNormalization then
-			data = net.normalize(data)
-		end
-		if self.sMode == "*l" then
-			handle:send(data .. "\n")
-		elseif self.sMode == "b" then
-			handle:send(self:packMsg(data))
-		else
-			handle:send(data)
-		end
-	end
-	function c:sendAllData(handle, data)
-		if self.autoNormalization then
-			data = net.normalize(data)
-		end
-		handle:send(data)
-	end
-	function c:pollClientModules(ip, port)
-		self:send(ip, "L!", port)
-	end
-	function c:CIDFrom(ip, port)
-		--print("Method not supported when using a TCP Server!")
-		return "CIDs in TCP work differently!"
-	end
-	function c:sendAll(data)
-		for i, v in pairs(self.ips) do
-			self:send(v, data)
-		end
-	end
-	function c:sendAllBut(data, cid)
-		for i, v in pairs(self.ips) do
-			if not (cid == i) then
-				self:send(v, data)
-			end
-		end
-	end
-	function c:clientRegistered(cid)
-		return self.ips[cid]
-	end
-	function c:clientLoggedIn(cid)
-		return self.ips[cid]
-	end
-	function c:getUpdater(cid)
-		return self.updates[cid]
-	end
-	function c:update()
-		local client = self.tcp:accept(self.rMode)
-		if not client then
-			return
-		end
-		table.insert(self.ips, client)
-		client:settimeout(0)
-		client:setoption("keepalive", true)
-		ip, port = client:getpeername()
-		if ip and port then
-			self.OnClientConnected:Fire(self, client, client, ip)
-			multi:newThread("ServerClientHandler",function()
-				while true do
-					thread.skip(1)
-					local data, err, dat, len
-					if self.rMode == "b" then
-						thread.hold(
-							function()
-								dat = client:receive(self.numspace)
-								return dat
-							end
-						)
-						len = bin.new(dat):getBlock("n", self.numspace)
-						data, err = client:receive(len)
-					else
-						data, err = client:receive(self.rMode)
-					end
-					if err == "closed" then
-						for i = 1, #self.ips do
-							if self.ips[i] == client then
-								table.remove(self.ips, i)
-							end
-						end
-						self.OnClientClosed:Fire(self, "Client Closed Connection!", client, client, ip)
-						self.links[client] = nil -- lets clean up
-						self:Destroy()
-						thread.kill()
-					end
-					if data then
-						if self.autoNormalization then
-							data = net.denormalize(data)
-						end
-						if net.inList(self.bannedIPs, ip) then
-							return
-						end
-						local hook = data:match("!(.-)!")
-						self.OnDataRecieved:getConnection(hook):Fire(self, data, client, client, ip, self)
-						if data:sub(1, 2) == "L!" then
-							cList = data
-							local list = {}
-							for m, v in cList:gmatch("(%S-):(%S-)|") do
-								list[m] = v
-							end
-							self.OnClientsModulesList:Fire(list, client, client, ip)
-						end
-					end
-				end
-			end)
-		end
-	end
-	c.OnClientsModulesList = multi:newConnection()
-	c.OnDataRecieved = multi:newConnection()
-	c.OnClientClosed = multi:newConnection()
-	c.OnClientConnected = multi:newConnection()
-	table.insert(net.ConnectionDriver, c)
-	net.OnServerCreated:Fire(c)
-	return c
-end
-function net:newTCPClient(host, port)
-	local c = {}
-	c.ip = assert(socket.dns.toip(host))
-	c.tcp = socket.connect(c.ip, port)
-	if not c.tcp then
-		--print("Can't connect to the server: no response from server")
-		return false
-	end
-	c.tcp:settimeout(0)
-	--c.tcp:setoption('tcp-nodelay', true)
-	c.tcp:setoption("keepalive", true)
-	c.Type = "tcp"
-	c.autoReconnect = true
-	c.rMode = "*l"
-	c.sMode = "*l"
-	c.autoNormalization = false
-	c.numspace = 4
-	function c:enableBinaryMode()
-		self.rMode = "b"
-		self.sMode = "b"
-	end
-	function c:setReceiveMode(mode)
-		self.rMode = mode
-	end
-	function c:setSendMode(mode)
-		self.sMode = mode
-	end
-	function c:packMsg(data)
-		local temp = bin.new()
-		temp:addBlock(#data, self.numspace)
-		temp:addBlock(data)
-		return temp:getData()
-	end
-	function c:send(data)
-		if self.autoNormalization then
-			data = net.normalize(data)
-		end
-		if self.sMode == "*l" then
-			ind, err = self.tcp:send(data .. "\n")
-		elseif self.sMode == "b" then
-			ind, err = self.tcp:send(self:packMsg(data))
-		else
-			ind, err = self.tcp:send(data)
-		end
-		if err == "closed" then
-			self.OnClientDisconnected:Fire(self, err)
-		elseif err == "timeout" then
-			self.OnClientDisconnected:Fire(self, err)
-		elseif err then
-			--print(err)
-		end
-	end
-	function c:sendRaw(data)
-		if self.autoNormalization then
-			data = net.normalize(data)
-		end
-		self.tcp:send(data)
-	end
-	function c:getCID()
-		return "No Cid on a tcp client!"
-	end
-	function c:close()
-		self.tcp:close()
-	end
-	function c:IDAssigned()
-		return true
-	end
-	function c:update()
-		if not self.tcp then
-			return
-		end
-		local data, err, dat
-		if self.rMode == "b" then
-			thread.hold(
-				function()
-					dat = self.tcp:receive(self.numspace)
-					return dat
-				end
-			)
-			len = bin.new(dat):getBlock("n", self.numspace)
-			data, err = self.tcp:receive(len)
-		else
-			data, err = self.tcp:receive()
-		end
-		if err == "closed" then
-			self.OnClientDisconnected:Fire(self, err)
-		elseif err == "timeout" then
-			self.OnClientDisconnected:Fire(self, err)
-		elseif err then
-			--print(err)
-		end
-		if data then
-			if self.autoNormalization then
-				data = net.denormalize(data)
-			end
-			local hook = data:match("!(.-)!")
-			self.OnDataRecieved:getConnection(hook):Fire(self, data)
-		end
-	end
-	function c:reconnect()
-		multi:newFunction(
-			function(func)
-				self.tcp = socket.connect(self.ip, self.port)
-				if self.tcp == nil then
-					--print("Can't connect to the server: No response from server!")
-					multi:newAlarm(3):OnRing(
-						function(alarm)
-							self:reconnect()
-							alarm:Destroy()
-							return
-						end
-					):setName("net.timeoutTask")
-				end
-				self.OnConnectionRegained:Fire(self)
-				self.tcp:settimeout(0)
-				--self.tcp:setoption('tcp-nodelay', true)
-				self.tcp:setoption("keepalive", true)
-			end
-		)
-	end
-	c.event =
-		multi:newEvent(
-		function(event)
-			return event.link:IDAssigned()
-		end
-	):OnEvent(
-		function(event)
-			event.link.OnClientReady:Fire(event.link)
-			event:Destroy()
-		end
-	)
-	c.event:setName("net.handshakeTask")
-	c.event.link = c
-	c.OnClientReady = multi:newConnection()
-	c.OnClientDisconnected = multi:newConnection()
-	c.OnDataRecieved = multi:newConnection()
-	c.OnConnectionRegained = multi:newConnection()
-	table.insert(net.ConnectionDriver, c)
-	net.OnClientCreated:Fire(c)
-	return c
-end
-net.timer = multi:newTimer():Start()
-multi:newThread(
-	"ClientServerHandler",
-	function()
-		while true do
-			thread.skip()
-			for i = 1, #net.ConnectionDriver do
-				thread.skip()
-				net.ConnectionDriver[i]:update()
-			end
-			if net.timer:Get() >= 1 then
-				for i = 1, #net.BroadcastDriver do
-					net.BroadcastDriver[i]()
-				end
-				net.timer:Reset()
-			end
-		end
-	end
-)
+-- function net:newTCPServer(port)
+-- 	local c = {}
+-- 	local port = port or 0
+-- 	c.tcp = assert(socket.bind("*", port))
+-- 	c.tcp:settimeout(0)
+-- 	c.ip, c.port = c.tcp:getsockname()
+-- 	c.ips = {}
+-- 	if port == 0 then
+-- 		_, c.port = c.tcp:getsockname()
+-- 	end
+-- 	c.ids = {}
+-- 	c.bannedIPs = {}
+-- 	c.Type = "tcp"
+-- 	c.rMode = "*l"
+-- 	c.sMode = "*l"
+-- 	c.updaterRate = 1
+-- 	c.autoNormalization = false
+-- 	c.updates = {}
+-- 	c.links = {}
+-- 	c.numspace = 4
+-- 	c.broad = socket.udp()
+-- 	c.hostip = net.getLocalIP()
+-- 	function c:packMsg(data)
+-- 		local temp = bin.new()
+-- 		temp:addBlock(#data, self.numspace, "n")
+-- 		temp:addBlock(data)
+-- 		return temp:getData()
+-- 	end
+-- 	function c:enableBinaryMode()
+-- 		self.rMode = "b"
+-- 		self.sMode = "b"
+-- 	end
+-- 	function c:broadcast(name)
+-- 		table.insert(
+-- 			net.BroadcastDriver,
+-- 			function(loop, dt)
+-- 				self.broad:setoption("broadcast", true)
+-- 				self.broad:sendto(name .. "|" .. self.Type .. "|" .. self.hostip .. ":" .. self.port, "255.255.255.255", 11111)
+-- 				self.broad:setoption("broadcast", false)
+-- 			end
+-- 		)
+-- 	end
+-- 	function c:setUpdateRate(n)
+-- 		self.updaterRate = n
+-- 	end
+-- 	function c:setReceiveMode(mode)
+-- 		self.rMode = mode
+-- 	end
+-- 	function c:setSendMode(mode)
+-- 		self.sMode = mode
+-- 	end
+-- 	function c:banCID(cid)
+-- 		--print("Function not supported on a tcp server!")
+-- 	end
+-- 	function c:banIP(ip)
+-- 		table.insert(self.bannedIPs, cid)
+-- 	end
+-- 	function c:send(handle, data)
+-- 		if self.autoNormalization then
+-- 			data = net.normalize(data)
+-- 		end
+-- 		if self.sMode == "*l" then
+-- 			handle:send(data .. "\n")
+-- 		elseif self.sMode == "b" then
+-- 			handle:send(self:packMsg(data))
+-- 		else
+-- 			handle:send(data)
+-- 		end
+-- 	end
+-- 	function c:sendAllData(handle, data)
+-- 		if self.autoNormalization then
+-- 			data = net.normalize(data)
+-- 		end
+-- 		handle:send(data)
+-- 	end
+-- 	function c:pollClientModules(ip, port)
+-- 		self:send(ip, "L!", port)
+-- 	end
+-- 	function c:CIDFrom(ip, port)
+-- 		--print("Method not supported when using a TCP Server!")
+-- 		return "CIDs in TCP work differently!"
+-- 	end
+-- 	function c:sendAll(data)
+-- 		for i, v in pairs(self.ips) do
+-- 			self:send(v, data)
+-- 		end
+-- 	end
+-- 	function c:sendAllBut(data, cid)
+-- 		for i, v in pairs(self.ips) do
+-- 			if not (cid == i) then
+-- 				self:send(v, data)
+-- 			end
+-- 		end
+-- 	end
+-- 	function c:clientRegistered(cid)
+-- 		return self.ips[cid]
+-- 	end
+-- 	function c:clientLoggedIn(cid)
+-- 		return self.ips[cid]
+-- 	end
+-- 	function c:getUpdater(cid)
+-- 		return self.updates[cid]
+-- 	end
+-- 	function c:update()
+-- 		local client = self.tcp:accept(self.rMode)
+-- 		if not client then
+-- 			return
+-- 		end
+-- 		table.insert(self.ips, client)
+-- 		client:settimeout(0)
+-- 		client:setoption("keepalive", true)
+-- 		ip, port = client:getpeername()
+-- 		if ip and port then
+-- 			self.OnClientConnected:Fire(self, client, client, ip)
+-- 			multi:newThread("ServerClientHandler",function()
+-- 				while true do
+-- 					thread.skip(1)
+-- 					local data, err, dat, len
+-- 					if self.rMode == "b" then
+-- 						thread.hold(
+-- 							function()
+-- 								dat = client:receive(self.numspace)
+-- 								return dat
+-- 							end
+-- 						)
+-- 						len = bin.new(dat):getBlock("n", self.numspace)
+-- 						data, err = client:receive(len)
+-- 					else
+-- 						data, err = client:receive(self.rMode)
+-- 					end
+-- 					if err == "closed" then
+-- 						for i = 1, #self.ips do
+-- 							if self.ips[i] == client then
+-- 								table.remove(self.ips, i)
+-- 							end
+-- 						end
+-- 						self.OnClientClosed:Fire(self, "Client Closed Connection!", client, client, ip)
+-- 						self.links[client] = nil -- lets clean up
+-- 						self:Destroy()
+-- 						thread.kill()
+-- 					end
+-- 					if data then
+-- 						if self.autoNormalization then
+-- 							data = net.denormalize(data)
+-- 						end
+-- 						if net.inList(self.bannedIPs, ip) then
+-- 							return
+-- 						end
+-- 						local hook = data:match("!(.-)!")
+-- 						self.OnDataRecieved:getConnection(hook):Fire(self, data, client, client, ip, self)
+-- 						if data:sub(1, 2) == "L!" then
+-- 							cList = data
+-- 							local list = {}
+-- 							for m, v in cList:gmatch("(%S-):(%S-)|") do
+-- 								list[m] = v
+-- 							end
+-- 							self.OnClientsModulesList:Fire(list, client, client, ip)
+-- 						end
+-- 					end
+-- 				end
+-- 			end)
+-- 		end
+-- 	end
+-- 	c.OnClientsModulesList = multi:newConnection()
+-- 	c.OnDataRecieved = multi:newConnection()
+-- 	c.OnClientClosed = multi:newConnection()
+-- 	c.OnClientConnected = multi:newConnection()
+-- 	table.insert(net.ConnectionDriver, c)
+-- 	net.OnServerCreated:Fire(c)
+-- 	return c
+-- end
+-- function net:newTCPClient(host, port)
+-- 	local c = {}
+-- 	c.ip = assert(socket.dns.toip(host))
+-- 	c.tcp = socket.connect(c.ip, port)
+-- 	if not c.tcp then
+-- 		--print("Can't connect to the server: no response from server")
+-- 		return false
+-- 	end
+-- 	c.tcp:settimeout(0)
+-- 	--c.tcp:setoption('tcp-nodelay', true)
+-- 	c.tcp:setoption("keepalive", true)
+-- 	c.Type = "tcp"
+-- 	c.autoReconnect = true
+-- 	c.rMode = "*l"
+-- 	c.sMode = "*l"
+-- 	c.autoNormalization = false
+-- 	c.numspace = 4
+-- 	function c:enableBinaryMode()
+-- 		self.rMode = "b"
+-- 		self.sMode = "b"
+-- 	end
+-- 	function c:setReceiveMode(mode)
+-- 		self.rMode = mode
+-- 	end
+-- 	function c:setSendMode(mode)
+-- 		self.sMode = mode
+-- 	end
+-- 	function c:packMsg(data)
+-- 		local temp = bin.new()
+-- 		temp:addBlock(#data, self.numspace)
+-- 		temp:addBlock(data)
+-- 		return temp:getData()
+-- 	end
+-- 	function c:send(data)
+-- 		if self.autoNormalization then
+-- 			data = net.normalize(data)
+-- 		end
+-- 		if self.sMode == "*l" then
+-- 			ind, err = self.tcp:send(data .. "\n")
+-- 		elseif self.sMode == "b" then
+-- 			ind, err = self.tcp:send(self:packMsg(data))
+-- 		else
+-- 			ind, err = self.tcp:send(data)
+-- 		end
+-- 		if err == "closed" then
+-- 			self.OnClientDisconnected:Fire(self, err)
+-- 		elseif err == "timeout" then
+-- 			self.OnClientDisconnected:Fire(self, err)
+-- 		elseif err then
+-- 			--print(err)
+-- 		end
+-- 	end
+-- 	function c:sendRaw(data)
+-- 		if self.autoNormalization then
+-- 			data = net.normalize(data)
+-- 		end
+-- 		self.tcp:send(data)
+-- 	end
+-- 	function c:getCID()
+-- 		return "No Cid on a tcp client!"
+-- 	end
+-- 	function c:close()
+-- 		self.tcp:close()
+-- 	end
+-- 	function c:IDAssigned()
+-- 		return true
+-- 	end
+-- 	function c:update()
+-- 		if not self.tcp then
+-- 			return
+-- 		end
+-- 		local data, err, dat
+-- 		if self.rMode == "b" then
+-- 			thread.hold(
+-- 				function()
+-- 					dat = self.tcp:receive(self.numspace)
+-- 					return dat
+-- 				end
+-- 			)
+-- 			len = bin.new(dat):getBlock("n", self.numspace)
+-- 			data, err = self.tcp:receive(len)
+-- 		else
+-- 			data, err = self.tcp:receive()
+-- 		end
+-- 		if err == "closed" then
+-- 			self.OnClientDisconnected:Fire(self, err)
+-- 		elseif err == "timeout" then
+-- 			self.OnClientDisconnected:Fire(self, err)
+-- 		elseif err then
+-- 			--print(err)
+-- 		end
+-- 		if data then
+-- 			if self.autoNormalization then
+-- 				data = net.denormalize(data)
+-- 			end
+-- 			local hook = data:match("!(.-)!")
+-- 			self.OnDataRecieved:getConnection(hook):Fire(self, data)
+-- 		end
+-- 	end
+-- 	function c:reconnect()
+-- 		multi:newFunction(
+-- 			function(func)
+-- 				self.tcp = socket.connect(self.ip, self.port)
+-- 				if self.tcp == nil then
+-- 					--print("Can't connect to the server: No response from server!")
+-- 					multi:newAlarm(3):OnRing(
+-- 						function(alarm)
+-- 							self:reconnect()
+-- 							alarm:Destroy()
+-- 							return
+-- 						end
+-- 					):setName("net.timeoutTask")
+-- 				end
+-- 				self.OnConnectionRegained:Fire(self)
+-- 				self.tcp:settimeout(0)
+-- 				--self.tcp:setoption('tcp-nodelay', true)
+-- 				self.tcp:setoption("keepalive", true)
+-- 			end
+-- 		)
+-- 	end
+-- 	c.event =
+-- 		multi:newEvent(
+-- 		function(event)
+-- 			return event.link:IDAssigned()
+-- 		end
+-- 	):OnEvent(
+-- 		function(event)
+-- 			event.link.OnClientReady:Fire(event.link)
+-- 			event:Destroy()
+-- 		end
+-- 	)
+-- 	c.event:setName("net.handshakeTask")
+-- 	c.event.link = c
+-- 	c.OnClientReady = multi:newConnection()
+-- 	c.OnClientDisconnected = multi:newConnection()
+-- 	c.OnDataRecieved = multi:newConnection()
+-- 	c.OnConnectionRegained = multi:newConnection()
+-- 	table.insert(net.ConnectionDriver, c)
+-- 	net.OnClientCreated:Fire(c)
+-- 	return c
+-- end
+-- net.timer = multi:newTimer():Start()
+-- multi:newThread(
+-- 	"ClientServerHandler",
+-- 	function()
+-- 		while true do
+-- 			thread.skip()
+-- 			for i = 1, #net.ConnectionDriver do
+-- 				thread.skip()
+-- 				net.ConnectionDriver[i]:update()
+-- 			end
+-- 			if net.timer:Get() >= 1 then
+-- 				for i = 1, #net.BroadcastDriver do
+-- 					net.BroadcastDriver[i]()
+-- 				end
+-- 				net.timer:Reset()
+-- 			end
+-- 		end
+-- 	end
+-- )
 return net

@@ -21,6 +21,7 @@ function server:init(type)
     self.localIP = net.getLocalIP()
     self.Type = type
     self.ips = {}
+    self.links = {}
     self.cids = {}
     self.process = multi:newProcessor()
     self.process.Start()
@@ -44,24 +45,21 @@ function server:setSendMode(mode)
     self.sMode = mode
 end
 function server:broadcast(name)
-    bCaster = bCaster + 1
-    self.process:newThread("Broadcast Handler<"..bCaster..">",function()
-        while true do
-            thread.yield()
-            self.broad:setoption("broadcast",true)
-            self.broad:sendto(table.concat({name,self.Type,self.localIP},"|")..":"..self.port, "255.255.255.255", 11111)
-            self.broad:setoption("broadcast", false)
-        end
-    end)
-end
-function server:send(data,cid)
-    local dat = {data = data, cid = cid}
-    if self.Type == "udp" then
-        self.OnPreSend:Fire(dat)
-        self.udp:sendto(dat.data,dat.cid.ip,dat.cid.port)
-    elseif self.Type == "tcp" then
-        --
+    if not self.isBroadcasting then
+        bCaster = bCaster + 1
+        self.isBroadcasting = true
+        self.process:newThread("Broadcast Handler<"..bCaster..">",function()
+            while true do
+                thread.yield()
+                self.broad:setoption("broadcast",true)
+                self.broad:sendto(table.concat({name,self.Type,self.localIP},"|")..":"..self.port, "255.255.255.255", 11111)
+                self.broad:setoption("broadcast", false)
+            end
+        end)
     end
+end
+function server:send(cid,data)
+    -- Override this
 end
 function server:getCid(ip,port)
     if self.cids[ip .. port] then

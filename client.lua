@@ -1,8 +1,10 @@
 package.path = "./?/init.lua;./?.lua;"..package.path
-local net = require("net.udp")
-local client = net:newUDPClient("localhost",12345)
+local net = require("net.tcp")
+local client = net:newTCPClient("localhost",12345)
 
-client:send("Test!")
+multi:newAlarm(1):OnRing(function()
+    client:send("Test!")
+end)
 
 client.OnDataRecieved(function(c,data)
     print("Response: ",data)

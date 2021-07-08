@@ -15,8 +15,6 @@ function net:newUDPServer(port)
     c.udp = assert(socket.udp())
     c.udp:settimeout(0)
     c.udp:setsockname("*",port)
-    c.bannedIPs = {}
-    c.bannedCIDs = {}
     local inactivity = {}
     if port == 0 then
         _,c.port = c.udp:getsockname()
@@ -24,6 +22,11 @@ function net:newUDPServer(port)
         c.port = port
     end
     udpcount = udpcount + 1
+    function c:send(cid,data)
+        local dat = {data = data, cid = cid}
+        self.OnPreSend:Fire(dat)
+        self.udp:sendto(dat.data,dat.cid.ip,dat.cid.port)
+    end
     c.updateThread = c.process:newThread("UDPServer Thread<"..udpcount..">",function()
         local sideJob = thread:newFunction(function()
             thread.sleep(60*c.idleRate)
@@ -55,12 +58,13 @@ function net:newUDPServer(port)
                     cd.activity = os.clock()
                     c.cids[ip .. port] = cd
                     cid = cd
+                    c.OnClientConnected:Fire(c, cd, ip, port)
                 end
                 print("Refreshing CID: ",cid," Activity!")
                 cid.activity = os.clock()
                 local dat = {data = data,cid = cid}
                 c.OnPreRecieved:Fire(dat)
-                c.OnDataRecieved:Fire(c,dat.data,dat.cid)
+                c.OnDataRecieved:Fire(c,dat.data,dat.cid,cid.ip,cid.port)
             end
         end
     end).OnError(function(...)
@@ -76,6 +80,11 @@ function net:newUDPClient(host, port)
     c.udp = assert(socket.udp())
     c.udp:settimeout(0)
     c.udp:setpeername(c.ip,port)
+    function c:send(data)
+        local dat = {data = data}
+        self.OnPreSend:Fire(dat)
+        self.udp:send(dat.data)
+    end
     c.updateThread = c.process:newThread("UDPServer Thread<"..udpcount..">",function()
         while true do
             thread.skip(c.updaterRate)
