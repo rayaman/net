@@ -1,5 +1,7 @@
 # net (5.0.0) Total Rewrite
 
+This readme needs to be rewritten, that will happen when all planned features are added to v5
+
 I've returned to this project. Mainly to create a way to test my multi-tasking library. Notable features, create server/client connections that work async. Added wrapper for http and https request (multi, luasocket and luasec required) to work in coroutines without needing a lua-core modifacation.
 
 # Discord
@@ -22,12 +24,12 @@ A simple and powerful way to make servers and clients
 - [ ] Improve 'stable' modules
 - [ ] AUDP - advance udp. Ensures packets arrive and handles late packets.
 - [ ] P2P - peer to peer (Server to set up initial connection)
-- [ ] Relay - offput server load (locally)
-- [ ] Threading - Simple threading ~~(UDP/AUDP Only)~~ Thanks to an updated multi library we can thread with ease
+- [ ] Threading (requires lanes which is installed when multi is installed)
 - [ ] Priority handling
 
 # Note
 You will see a bunch of files inside of the net folder. All that is stable is the init.lua and sft.lua file. Everything else is a work in progress. Plus I am planning on rewritting all of the modules to take advantage of the new threading features that are found in the new multi updates. PRogress on this will be made soon. I have just been away from my PC for a while.
+
 # Usage
 server.lua
 ```lua
