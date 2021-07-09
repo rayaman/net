@@ -1,17 +1,18 @@
 local multi, thread = require("multi"):init()
 local client = {}
 client.__index = client
-client.OnDataRecieved = multi:newConnection()
-client.OnServerNotAvailable = multi:newConnection()
-client.OnClientReady = multi:newConnection()
-client.OnClientDisconnected = multi:newConnection()
-client.OnConnectionRegained = multi:newConnection()
-client.OnPreSend = multi:newConnection()
-client.OnPreRecieved = multi:newConnection()
 client.updaterRate = 1
 client.sMode = "*l"
 client.rMode = "*l"
 function client:init(type)
+    self.OnDataRecieved = multi:newConnection()
+    self.OnServerNotAvailable = multi:newConnection()
+    self.OnClientReady = multi:newConnection()
+    self.OnClientDisconnected = multi:newConnection()
+    self.OnConnectionRegained = multi:newConnection()
+    self.OnPreSend = multi:newConnection()
+    self.OnPreRecieved = multi:newConnection()
+    self.OnError = multi:newConnection()
     self.Type = type
     self.process = multi:newProcessor()
     self.process.Start()

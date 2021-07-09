@@ -88,6 +88,9 @@ function net:newTCPClient(host, port)
     c.tcp:settimeout(0)
     c.tcp:setoption("keepalive",true)
     function c:send(data)
+        if self.sMode == "*l" then
+            data = data .. "\n"
+        end
         print("Sending:",data)
         local dat = {data = data}
         self.OnPreSend:Fire(dat)
@@ -100,7 +103,7 @@ function net:newTCPClient(host, port)
             self.OnClientDisconnected:Fire(self,err)
         end
     end
-    c.updateThread = c.process:newThread("TCPServer Thread<"..tcpcount..">",function()
+    c.updateThread = c.process:newThread("TCPClient Thread<"..tcpcount..">",function()
         while true do
             thread.skip(c.updaterRate)
             local data = thread.hold(function()
@@ -116,9 +119,7 @@ function net:newTCPClient(host, port)
                 else
                     return d
                 end
-			end).OnError(function(...)
-                print(...)
-            end)
+			end)
             if data then
                 local dat = {data = data}
                 c.OnPreRecieved:Fire(dat)
