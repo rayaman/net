@@ -1,10 +1,6 @@
-# net (2.0.1)
-Updated from 2.0.0 to 2.0.1
-Added:
-- Examples
-- Support for latest multi version
-- Updated readme
+# net (5.0.0) Total Rewrite
 
+I've returned to this project. Mainly to create a way to test my multi-tasking library. Notable features, create server/client connections that work async. Added wrapper for http and https request (multi, luasocket and luasec required) to work in coroutines without needing a lua-core modifacation.
 
 # Discord
 For real-time assistance with my libraries! A place where you can ask questions and get help with any of my libraries</br>
@@ -39,7 +35,7 @@ require("bin") -- this library needs a lot of work it has a bunch of old useless
 require("multi") -- you need this to handle multiple connections and such
 require("net") -- That requires the main library
 server=net:newTCPServer(12345) -- create a server that listens on port 12345
-server.OnDataRecieved(function(self,data,CID_OR_HANDLE,IP_OR_HANDLE,PORT_OR_IP,UPDATER_OR_NIL) -- a bit confusing, but dont worry you will hardly ever need more then the first 5 arguments, unless you are writing modules!
+server.OnDataRecieved(function(self, data, CID, IP, PORT) -- a bit confusing, but dont worry you will hardly ever need more then the first 5 arguments, unless you are writing modules!
   if data=="Hello!" then
     print("Got response from client sending back data!")
     self:send(IP_OR_HANDLE,"Hello Client!",PORT_OR_IP) -- doing it like this makes this code work for both udp and tcp

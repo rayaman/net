@@ -8,4 +8,7 @@
 -- end)
 -- multi:mainloop()
 http = require("socket.http")
-print(http.request("http://zjcdn.mangafox.me/store/manga/33769/091/compressed/s20210705_163050_598.jpg"))
+data, code, headers = http.request("http://zjcdn.mangafox.me/store/manga/33769/091.0/compressed/s20210705_163050_598.jpg")
+for i,v in pairs(headers) do
+    print(i,v)
+end
