@@ -49,6 +49,7 @@ function server:broadcast(name)
         bCaster = bCaster + 1
         self.isBroadcasting = true
         self.process:newThread("Broadcast Handler<"..bCaster..">",function()
+            print(table.concat({name,self.Type,self.localIP},"|")..":"..self.port)
             while true do
                 thread.yield()
                 self.broad:setoption("broadcast",true)

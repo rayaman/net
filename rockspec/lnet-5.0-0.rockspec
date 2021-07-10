@@ -21,5 +21,11 @@ build = {
    type = "builtin",
    modules = {
       ["net.init"] = "net/init.lua",
+      ["net.tcp.init] = "net/tcp/init.lua",
+      ["net.udp.init] = "net/udp/init.lua",
+      ["net.core.clientbase"] = "net/core/clientbase.lua"
+      ["net.core.serverbase"] = "net/core/serverbase.lua"
+      ["net.http"] = "net/http.lua"
+      ["net.https"] = "net/https.lua"
    }
 }

@@ -44,6 +44,7 @@ math.random()
 math.random()
 local multi, thread = require("multi").init()
 local socket = require("socket")
+local http = require("socket.http")
 --ssl=require("ssl")
 --https=require("ssl.https")
 local net = {}
@@ -98,7 +99,7 @@ function net.getLocalIP()
 	return dat
 end
 function net.getExternalIP()
-	local data = https.request("https://www.whatismypublicip.com/")
+	local data = http.request("http://www.myipnumber.com/my-ip-address.asp")
 	return data:match("(%d+%.%d+%.%d+%.%d+)")
 end
 function net:registerModule(mod, version)
@@ -153,11 +154,11 @@ function net:newCastedClient(name) -- connects to the broadcasted server
 	local timer = multi:newTimer()
 	while true do
 		local data, ip, port = listen:receivefrom()
-		if timer:Get() > 3 then
-			error("Timeout! Server by the name: " .. name .. " has not been found!")
-		end
+		-- if timer:Get() > 3 then
+		-- 	error("Timeout! Server by the name: " .. name .. " has not been found!")
+		-- end
 		if data then
-			--print("found!", data)
+			print("Found:", data)
 			local n, tp, ip, port = data:match("(%S-)|(%S-)|(%S-):(%d+)")
 			if n:match(name) then
 				--print("Found Server!", n, tp, ip, port)

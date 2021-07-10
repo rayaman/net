@@ -1,8 +1,7 @@
 local net = require("net")
-local clientbase = require("net.clientbase")
-local serverbase = require("net.serverbase")
+local clientbase = require("net.core.clientbase")
+local serverbase = require("net.core.serverbase")
 local multi, thread = require("multi"):init()
-local GLOBAL, THREAD = require("multi.integration.threading"):init()
 local tcpcount = 0
 function net:newTCPServer(port)
     local c = {}

@@ -9,7 +9,7 @@
 local socket = require("socket")
 local ssl    = require("ssl")
 local ltn12  = require("ltn12")
-local http   = require("net.http")
+local http   = require("net.http") -- Only real change that was needed to get things working
 local url    = require("socket.url")
 
 local try    = socket.try
