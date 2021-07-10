@@ -1,4 +1,4 @@
-local net = require("net")
+local net = require("lnet")
 local clientbase = require("net.core.clientbase")
 local serverbase = require("net.core.serverbase")
 local multi, thread = require("multi"):init()

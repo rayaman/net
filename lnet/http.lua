@@ -7,7 +7,7 @@
 -----------------------------------------------------------------------------
 -- Declare module and import dependencies
 -------------------------------------------------------------------------------
-local net = require("net")
+local net = require("lnet")
 local multi, thread = require("multi"):init()
 local socket = require("socket")
 local url = require("socket.url")

@@ -1,6 +1,6 @@
 local multi, thread = require("multi"):init()
 local socket = require("socket")
-local net = require("net")
+local net = require("lnet")
 local server = {}
 local bCaster = 0
 server.__index = server

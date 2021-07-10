@@ -1,5 +1,5 @@
 package.path = "./?/init.lua;./?.lua;"..package.path
-local net = require("net.tcp")
+local net = require("lnet.tcp")
 local multi, thread = require("multi"):init()
 local server = net:newTCPServer(12345)
 server:broadcast("Test")

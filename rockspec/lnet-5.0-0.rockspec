@@ -1,15 +1,15 @@
-package = "lnet"
+package = "llnet"
 version = "5.0-0"
 source = {
-   url = "git://github.com/rayaman/net.git",
-   tag = "net-v5",
+   url = "git://github.com/rayaman/lnet.git",
+   tag = "lnet-v5",
 }
 description = {
-   summary = "Lua networking library that wraps around lua-socket to make networking easy.",
+   summary = "Lua lnetworking library that wraps around lua-socket to make lnetworking easy.",
    detailed = [[
-      This library uses the multi library. The new multitasking library and this one are now co-Dependant if using the networkManager integration for network parallelism. This has an event driven approach for networking which allows one to easily work async with the data.
+      This library uses the multi library. The new multitasking library and this one are now co-Dependant if using the lnetworkManager integration for lnetwork parallelism. This has an event driven approach for lnetworking which allows one to easily work async with the data.
    ]],
-   homepage = "https://github.com/rayaman/net",
+   homepage = "https://github.com/rayaman/lnet",
    license = "MIT"
 }
 dependencies = {
@@ -20,12 +20,12 @@ dependencies = {
 build = {
    type = "builtin",
    modules = {
-      ["net.init"] = "net/init.lua",
-      ["net.tcp.init"] = "net/tcp/init.lua",
-      ["net.udp.init"] = "net/udp/init.lua",
-      ["net.core.clientbase"] = "net/core/clientbase.lua",
-      ["net.core.serverbase"] = "net/core/serverbase.lua",
-      ["net.http"] = "net/http.lua",
-      ["net.https"] = "net/https.lua"
+      ["lnet.init"] = "lnet/init.lua",
+      ["lnet.tcp.init"] = "lnet/tcp/init.lua",
+      ["lnet.udp.init"] = "lnet/udp/init.lua",
+      ["lnet.core.clientbase"] = "lnet/core/clientbase.lua",
+      ["lnet.core.serverbase"] = "lnet/core/serverbase.lua",
+      ["lnet.http"] = "lnet/http.lua",
+      ["lnet.https"] = "lnet/https.lua"
    }
 }
