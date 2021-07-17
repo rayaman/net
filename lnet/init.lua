@@ -38,7 +38,7 @@ end
 for i = 97, 122 do
 	char[#char + 1] = string.char(i)
 end
-local isHyphen = {[9] = 1, [14] = 1, [19] = 1, [24] = 1}
+
 math.random()
 math.random()
 math.random()
@@ -48,8 +48,8 @@ local http = require("socket.http")
 --ssl=require("ssl")
 --https=require("ssl.https")
 local net = {}
-net.Version = {4, 0, 0} -- This will probably stay this version for quite a while... The modules on the otherhand will change more often
-net._VERSION = "4.0.0"
+net.Version = {5, 0, 0} -- This will probably stay this version for quite a while... The modules on the otherhand will change more often
+net._VERSION = "5.0.0"
 net.ClientCache = {}
 net.OnServerCreated = multi:newConnection()
 net.OnClientCreated = multi:newConnection()
@@ -59,6 +59,7 @@ net.autoInit = true
 net.ConnectionDriver = {}
 net.BroadcastDriver = {}
 math.randomseed(math.ceil(os.time()+(os.clock()*1000)))
+local isHyphen = {[9] = 1, [14] = 1, [19] = 1, [24] = 1}
 net.generateGUID = function(t)
 	local pass = {}
 	local a = 0
@@ -102,23 +103,20 @@ function net.getExternalIP()
 	local data = http.request("http://www.myipnumber.com/my-ip-address.asp")
 	return data:match("(%d+%.%d+%.%d+%.%d+)")
 end
-function net:registerModule(mod, version)
+function net.registerModule(mod, version)
 	if net[mod] then
-		error(
-			"Module by the name: " ..
-				mod .. " has already been registered! Remember some modules are internal and use certain names!"
-		)
+		error("Module by the name: " .. mod .. " has already been registered! Remember some modules are internal and use certain names!")
 	end
-	table.insert(self.loadedModules, mod)
+	table.insert(net.loadedModules, mod)
 	net[mod] = {}
 	if version then
 		net[mod].Version = version
-		net[mod]._VERSION = version[1] .. "." .. version[2] .. "." .. version[3]
+		net[mod]._VERSION = table.concat(version,".")
 	else
 		net[mod].Version = {1, 0, 0}
 		net[mod]._VERSION = {1, 0, 0}
 	end
-	return {Version = version, _VERSION = version[1] .. "." .. version[2] .. "." .. version[3]}
+	return {Version = version, _VERSION = table.concat(version,".")}
 end
 function net.getModuleVersion(ext)
 	if not ext then
@@ -145,33 +143,31 @@ end
 function net.setTrigger(funcW, funcE)
 	multi:newTrigger(func)
 end
-net:registerModule("net", net.Version)
+net.registerModule("net", net.Version)
 -- Client broadcast
-function net:newCastedClient(name) -- connects to the broadcasted server
+function net.newCastedClient(name) -- connects to the broadcasted server
 	local listen = socket.udp() -- make a new socket
 	listen:setsockname(net.getLocalIP(), 11111)
 	listen:settimeout(0)
 	local timer = multi:newTimer()
 	while true do
 		local data, ip, port = listen:receivefrom()
-		-- if timer:Get() > 3 then
-		-- 	error("Timeout! Server by the name: " .. name .. " has not been found!")
-		-- end
+		if timer:Get() > 3 then
+			error("Timeout! Server by the name: " .. name .. " has not been found!")
+		end
 		if data then
-			print("Found:", data)
 			local n, tp, ip, port = data:match("(%S-)|(%S-)|(%S-):(%d+)")
 			if n:match(name) then
-				--print("Found Server!", n, tp, ip, port)
 				if tp == "tcp" then
-					return net:newTCPClient(ip, tonumber(port))
+					return net.newTCPClient(ip, tonumber(port))
 				else
-					return net:newClient(ip, tonumber(port))
+					return net.newClient(ip, tonumber(port))
 				end
 			end
 		end
 	end
 end
-function net:newCastedClients(name) -- connects to the broadcasted server
+function net.newCastedClients(name) -- connects to the broadcasted server
 	local listen = socket.udp() -- make a new socket
 	listen:setsockname(net.getLocalIP(), 11111)
 	listen:settimeout(0)

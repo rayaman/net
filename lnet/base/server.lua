@@ -8,6 +8,7 @@ server.updaterRate = 1
 server.rMode = "*l"
 server.sMode = "*l"
 function server:init(type)
+    self.Type = type
     self.OnClientsModulesList = multi:newConnection()
     self.OnPreRecieved = multi:newConnection()
     self.OnDataRecieved = multi:newConnection()
@@ -15,11 +16,11 @@ function server:init(type)
     self.OnClientConnected = multi:newConnection()
     self.OnPreSend = multi:newConnection()
     self.idleRate = 5
+    self.clientHandlers = {}
     self.bannedCIDs = {}
     self.bannedIPs = {}
     self.broad = socket.udp()
     self.localIP = net.getLocalIP()
-    self.Type = type
     self.ips = {}
     self.links = {}
     self.cids = {}
@@ -49,11 +50,12 @@ function server:broadcast(name)
         bCaster = bCaster + 1
         self.isBroadcasting = true
         self.process:newThread("Broadcast Handler<"..bCaster..">",function()
-            print(table.concat({name,self.Type,self.localIP},"|")..":"..self.port)
             while true do
                 thread.yield()
                 self.broad:setoption("broadcast",true)
                 self.broad:sendto(table.concat({name,self.Type,self.localIP},"|")..":"..self.port, "255.255.255.255", 11111)
+                -- Send to localhost as well
+                self.broad:sendto(table.concat({name,self.Type,self.localIP},"|")..":"..self.port, self.localIP, 11111)
                 self.broad:setoption("broadcast", false)
             end
         end)

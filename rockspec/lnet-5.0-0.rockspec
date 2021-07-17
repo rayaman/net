@@ -15,6 +15,7 @@ description = {
 dependencies = {
    "lua >= 5.1",
    "luasocket",
+   "luasec",
    "multi",
 }
 build = {
@@ -23,8 +24,8 @@ build = {
       ["lnet.init"] = "lnet/init.lua",
       ["lnet.tcp.init"] = "lnet/tcp/init.lua",
       ["lnet.udp.init"] = "lnet/udp/init.lua",
-      ["lnet.core.clientbase"] = "lnet/core/clientbase.lua",
-      ["lnet.core.serverbase"] = "lnet/core/serverbase.lua",
+      ["lnet.base.client"] = "lnet/base/client.lua",
+      ["lnet.base.server"] = "lnet/base/server.lua",
       ["lnet.http"] = "lnet/http.lua",
       ["lnet.https"] = "lnet/https.lua"
    }

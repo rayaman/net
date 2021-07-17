@@ -1,9 +1,10 @@
 local net = require("lnet")
-local clientbase = require("net.core.clientbase")
-local serverbase = require("net.core.serverbase")
+local clientbase = require("lnet.base.client")
+local serverbase = require("lnet.base.server")
 local multi, thread = require("multi"):init()
+local socket = require("socket")
 local tcpcount = 0
-function net:newTCPServer(port)
+net.newTCPServer = thread:newFunction(function(port)
     local c = {}
     setmetatable(c,serverbase)
     c:init("tcp")
@@ -35,7 +36,8 @@ function net:newTCPServer(port)
                 ip, port = client:getpeername()
                 if ip and port then
                     c.OnClientConnected:Fire(c, client, ip, port)
-                    multi:newThread("ServerClientHandler",function()
+                    -- We need to cache the client handler so we can work with it
+                    c.clientHandlers[client] = multi:newThread("ServerClientHandler<".. tostring(client):match(": (.+)") ..">",function()
                         local cli = client
                         while true do
                             thread.yield()
@@ -66,8 +68,6 @@ function net:newTCPServer(port)
                                 c.OnDataRecieved:Fire(c, data, cli, ip, port)
                             end
                         end
-                    end).OnError(function(...)
-                        print(...)
                     end)
                 end
             end
@@ -75,10 +75,11 @@ function net:newTCPServer(port)
     end).OnError(function(...)
         print(...)
     end)
+    net.OnServerCreated:Fire(c)
     return c
-end
+end,true)
 
-function net:newTCPClient(host, port)
+net.newTCPClient = thread:newFunction(function(host, port)
     local c = {}
     setmetatable(c,clientbase)
     c:init("tcp")
@@ -128,6 +129,7 @@ function net:newTCPClient(host, port)
     end).OnError(function(...)
         print(...)
     end)
+    net.OnClientCreated:Fire(c)
     return c
-end
+end,true)
 return net

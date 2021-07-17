@@ -18,7 +18,7 @@ net.OnServerCreated:connect(function(s)
 		local cmd,arg1,arg2=data:match("!version! ")
 	end,"version")
 	s.OnClientConnected(function(self,CID_OR_HANDLE,IP_OR_HANDLE,PORT_OR_IP)
-		multi:newFunction(function(func) -- anom func, allows for fancy multitasking
+		multi:newFunction(function(func) -- anon func, allows for fancy multitasking
 			multi:newFunction(function(self)
 				local range=self:newRange()
 				for i in range(1,#self.loadedModules) do

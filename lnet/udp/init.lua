@@ -1,13 +1,13 @@
 local net = require("lnet")
-local clientbase = require("net.core.clientbase")
-local serverbase = require("net.core.serverbase")
+local clientbase = require("lnet.base.client")
+local serverbase = require("lnet.base.server")
 local multi, thread = require("multi"):init()
 local CID = {}
 CID.__index = cid
 local udpcount = 0
 CID.ip = "0.0.0.0"
 CID.port = 0
-function net:newUDPServer(port)
+net.newUDPServer = thread:newFunction(function(port)
     local c = {}
     setmetatable(c,serverbase)
     c:init("udp")
@@ -27,6 +27,7 @@ function net:newUDPServer(port)
         self.udp:sendto(dat.data,dat.cid.ip,dat.cid.port)
     end
     c.updateThread = c.process:newThread("UDPServer Thread<"..udpcount..">",function()
+        -- Every now and then we are going to check to see if a client has been inactive
         local sideJob = thread:newFunction(function()
             thread.sleep(60*c.idleRate)
             for i,v in pairs(c.cids) do
@@ -41,7 +42,7 @@ function net:newUDPServer(port)
         while true do
             thread.skip(c.updaterRate)
             local data, ip, port = c.udp:receivefrom()
-            sideJob().connect(function(yes,a,b,c)
+            sideJob().connect(function(yes)
                 if yes then
                     sideJob:Resume()
                 end
@@ -59,7 +60,6 @@ function net:newUDPServer(port)
                     cid = cd
                     c.OnClientConnected:Fire(c, cd, ip, port)
                 end
-                print("Refreshing CID: ",cid," Activity!")
                 cid.activity = os.clock()
                 local dat = {data = data,cid = cid}
                 c.OnPreRecieved:Fire(dat)
@@ -69,9 +69,10 @@ function net:newUDPServer(port)
     end).OnError(function(...)
         print(...)
     end)
+    net.OnServerCreated:Fire(c)
     return c
-end
-function net:newUDPClient(host, port)
+end,true)
+net.newUDPClient = thread:newFunction(function(host, port)
     local c = {}
     setmetatable(c,clientbase)
     c:init("udp")
@@ -95,6 +96,7 @@ function net:newUDPClient(host, port)
             c.OnDataRecieved:Fire(c,dat.data)
         end
     end)
+    net.OnClientCreated:Fire(c)
     return c
-end
+end,true)
 return net
