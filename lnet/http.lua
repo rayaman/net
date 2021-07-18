@@ -19,6 +19,7 @@ local base = _G
 local table = require("table")
 net.http = {}
 local _M = net.http
+local default_block_size = 1024
 
 -----------------------------------------------------------------------------
 -- Program constants
@@ -168,8 +169,16 @@ function metat.__index:receivebody(headers, sink, step)
     local mode = "default" -- connection close
     if t and t ~= "identity" then mode = "http-chunked"
     elseif base.tonumber(headers["content-length"]) then mode = "by-length" end
-    return self.try(ltn12.pump.all(socket.source(mode, self.c, length),
-        sink, step))
+    local ret,lp
+    lp = length%default_block_size
+    for i=1,math.floor(length/default_block_size) do
+        thread.yield()
+        ret = self.try(ltn12.pump.step(socket.source(mode, self.c, default_block_size), sink, step))
+    end
+    if lp~=0 then
+        ret = self.try(ltn12.pump.step(socket.source(mode, self.c, lp), sink, step))
+    end
+    return ret
 end
 
 function metat.__index:receive09body(status, sink, step)
@@ -313,7 +322,6 @@ trequest = thread:newFunction(function(reqt)
     local headers
     -- ignore any 100-continue messages
     while code == 100 do 
-        thread.yield()
         headers = h:receiveheaders()
         code, status = h:receivestatusline()
     end
