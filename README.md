@@ -27,7 +27,7 @@ A simple and powerful way to make servers and clients
 - [ ] AUDP - advance udp. Ensures packets arrive and handles late packets.
 - [ ] P2P - peer to peer (Server to set up initial connection)
 - [ ] Relay - offput server load (locally)
-- [ ] Threading - Simple threading ~~(UDP/AUDP Only)~~ Thanks to an updated multi library we can thread with ease
+- [ ] Threading - Simple threading Should be simple using multi@15.3.0
 - [ ] Priority handling
 
 # Note
