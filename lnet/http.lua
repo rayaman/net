@@ -174,6 +174,7 @@ function metat.__index:receivebody(headers, sink, step)
     for i=1,math.floor(length/default_block_size) do
         thread.yield()
         ret = self.try(ltn12.pump.step(socket.source(mode, self.c, default_block_size), sink, step))
+        thread.pushStatus(i,math.floor(length/default_block_size))
     end
     if lp~=0 then
         ret = self.try(ltn12.pump.step(socket.source(mode, self.c, lp), sink, step))
@@ -301,7 +302,7 @@ local trequest, tredirect
 end
 
 -- We don't need to protect this function the thread:newFunction wrapper handles errors for us
-trequest = thread:newFunction(function(reqt)
+function trequest(reqt)
     -- we loop until we get what we want, or
     -- until we are sure there is no way to get it
     local nreqt = adjustrequest(reqt)
@@ -338,7 +339,7 @@ trequest = thread:newFunction(function(reqt)
     end
     h:close()
     return 1, code, headers, status
-end,true)
+end
 
 local function srequest(u, b)
     local t = {}
@@ -363,9 +364,9 @@ local function srequest(u, b)
     end
 end
 
-_M.request = function(reqt, body)
+_M.request = thread:newFunction(function(reqt, body)
     if base.type(reqt) == "string" then return srequest(reqt, body)
     else return trequest(reqt) end
-end
+end,true)
 
 return _M
